@@ -19,13 +19,13 @@ Requirements:
 /home/david/venv; substitute your venv path.
 
   python3 -m venv /home/david/venv
-  /home/david/venv/bin/pip install -r /home/david/speech-to-text/requirements.txt
+  /home/david/venv/bin/pip install -r /home/david/speech-to-text-for-ubuntu/requirements.txt
 
 Automatic startup on boot:
 To automatically start this server on boot, you can use the following crontab entry
 for the user running the display (e.g. david):
 
-* * * * * ps -ef | grep "speech-to-text/servers/speech_to_text_server.py" | grep -v grep > /dev/null || /home/david/venv/bin/python3 /home/david/speech-to-text/servers/speech_to_text_server.py > /dev/null 2>&1 &
+* * * * * ps -ef | grep "speech-to-text-for-ubuntu/servers/speech_to_text_server.py" | grep -v grep > /dev/null || /home/david/venv/bin/python3 /home/david/speech-to-text-for-ubuntu/servers/speech_to_text_server.py > /dev/null 2>&1 &
 
 This cron job checks every minute if the script is running and if it is not, it starts the script.
 """

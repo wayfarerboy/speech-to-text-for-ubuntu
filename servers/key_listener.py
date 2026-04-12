@@ -19,15 +19,9 @@ Running as a regular user will result in permission errors.
 
 To automatically start this key listener on boot, you can use the following crontab entry for root:
 
-* * * * * ps -ef | grep "speech-to-text/servers/key_listener.py" | grep -v grep > /dev/null || /usr/bin/python3 /home/david/speech-to-text/servers/key_listener.py > /dev/null 2>&1 &
+* * * * * ps -ef | grep "speech-to-text-for-ubuntu/servers/key_listener.py" | grep -v grep > /dev/null || /usr/bin/python3 /home/david/speech-to-text-for-ubuntu/servers/key_listener.py > /dev/null 2>&1 &
 
 This cron job checks every minute if the script is running and if it is not, it starts the script.
-
-Usage (as root): python3 key_listener.py
-
-Tested on Kubuntu 24.04 LTS, Kali 2026.1 (KDE)
-
-Requirements: sudo apt install input-remapper alsa-utils python3-evdev
 
 """
 
@@ -89,9 +83,9 @@ STATIC_XAUTHORITY = ""
 PROCESS_FOR_XAUTH_COPY = "/usr/bin/ksmserver"
 
 # The script that will process the stored audio and generate text from it. 
-SPEECHTOTEXT_SCRIPT = "/home/david/speech-to-text/scripts/speech_to_text_client.py"
+SPEECHTOTEXT_SCRIPT = "/home/david/speech-to-text-for-ubuntu/scripts/speech_to_text_client.py"
 
-# Speech-to-text: PRIMARY_LANGUAGE on KEY_F16; 
+# PRIMARY_LANGUAGE on KEY_F16; 
 # optional SECONDARY_LANGUAGE on KEY_F17.
 # Leave SECONDARY_LANGUAGE empty ("") to listen only for KEY_F16.
 PRIMARY_LANGUAGE = "en"

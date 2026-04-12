@@ -41,11 +41,12 @@ sudo apt install -y \
 
 `xdotool` is used to type the transcript into the focused window. `xclip` is used for clipboard copy on X11, while `wl-clipboard` provides clipboard support on Wayland. `input-remapper` is strongly recommended for creating a reliable trigger key such as `F16`, and `evtest` helps you find the correct input device path. `libsndfile1` is required by the Python `soundfile` package.
 
-Clone the repository. The examples below assume the project is stored in `/home/david/speech-to-text` and the virtual environment is `/home/david/venv`. If your username or paths differ, adjust the configuration values in the scripts accordingly.
+Clone the repository. The examples below assume the project is stored in `/home/david/speech-to-text-for-ubuntu` and the virtual environment is `/home/david/venv`. If your username or paths differ, adjust the configuration values in the scripts accordingly.
 
 ```bash
-git clone https://github.com/CDNsun/speech-to-text-for-ubuntu.git /home/david/speech-to-text
-cd /home/david/speech-to-text
+cd /home/david
+git clone https://github.com/CDNsun/speech-to-text-for-ubuntu.git
+cd /home/david/speech-to-text-for-ubuntu
 ```
 
 Then create a Python virtual environment and install the Python dependencies from `requirements.txt`:
@@ -53,7 +54,7 @@ Then create a Python virtual environment and install the Python dependencies fro
 ```bash
 python3 -m venv /home/david/venv
 /home/david/venv/bin/pip install --upgrade pip
-/home/david/venv/bin/pip install -r /home/david/speech-to-text/requirements.txt
+/home/david/venv/bin/pip install -r /home/david/speech-to-text-for-ubuntu/requirements.txt
 ```
 
 The Python packages used by the project are `numpy`, `soundfile`, and `faster-whisper`.
@@ -141,7 +142,7 @@ COPY_TO_CLIPBOARD = ""
 Start the speech-to-text server as your normal desktop user:
 
 ```bash
-/home/david/venv/bin/python3 /home/david/speech-to-text/servers/speech_to_text_server.py
+/home/david/venv/bin/python3 /home/david/speech-to-text-for-ubuntu/servers/speech_to_text_server.py
 ```
 
 This starts a Unix socket server at:
@@ -153,7 +154,7 @@ This starts a Unix socket server at:
 Then start the key listener as root:
 
 ```bash
-sudo python3 /home/david/speech-to-text/servers/key_listener.py
+sudo python3 /home/david/speech-to-text-for-ubuntu/servers/key_listener.py
 ```
 
 Once both processes are running, focus the text field where you want the transcript to appear, press and hold your trigger key, speak, and release the key. The recorded audio is transcribed and the resulting text is typed into the currently focused window.
@@ -169,7 +170,7 @@ The project comments include simple cron-based startup examples.
 To start the server automatically as your desktop user, add this to your user crontab:
 
 ```cron
-* * * * * ps -ef | grep "speech-to-text/servers/speech_to_text_server.py" | grep -v grep > /dev/null || /home/david/venv/bin/python3 /home/david/speech-to-text/servers/speech_to_text_server.py > /dev/null 2>&1 &
+* * * * * ps -ef | grep "speech-to-text-for-ubuntu/servers/speech_to_text_server.py" | grep -v grep > /dev/null || /home/david/venv/bin/python3 /home/david/speech-to-text-for-ubuntu/servers/speech_to_text_server.py > /dev/null 2>&1 &
 ```
 
 Edit the user crontab with:
@@ -181,7 +182,7 @@ crontab -e
 To start the key listener automatically as root, add this to the root crontab:
 
 ```cron
-* * * * * ps -ef | grep "speech-to-text/servers/key_listener.py" | grep -v grep > /dev/null || /usr/bin/python3 /home/david/speech-to-text/servers/key_listener.py > /dev/null 2>&1 &
+* * * * * ps -ef | grep "speech-to-text-for-ubuntu/servers/key_listener.py" | grep -v grep > /dev/null || /usr/bin/python3 /home/david/speech-to-text-for-ubuntu/servers/key_listener.py > /dev/null 2>&1 &
 ```
 
 Edit the root crontab with:

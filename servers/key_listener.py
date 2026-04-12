@@ -80,7 +80,7 @@ STATIC_XAUTHORITY = ""
 # We will get XAUTHORITY variable from a running process (e.g., /usr/bin/ksmserver) owned by USER.
 # Find a process that is always running in single instance and owned by USER and has 
 # XAUTHORITY variable defined in its environment (see /proc/{pid}/environ)
-PROCESS_FOR_XAUTH_COPY = "/usr/bin/ksmserver"
+PROCESS_FOR_XAUTH_COPY = "/usr/bin/ksmserver" # for KDE, /usr/libexec/gsd-media-keys for GNOME
 
 # The script that will process the stored audio and generate text from it. 
 SPEECHTOTEXT_SCRIPT = "/home/david/speech-to-text-for-ubuntu/scripts/speech_to_text_client.py"

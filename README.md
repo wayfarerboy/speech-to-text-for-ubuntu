@@ -6,7 +6,7 @@ The main goal is low-latency local transcription that is still usable on ordinar
 
 The project is built from three parts. `servers/key_listener.py` listens for a hotkey, starts recording on key press, and stops on key release. `servers/speech_to_text_server.py` runs a local Unix socket server and performs speech-to-text with faster-whisper. `scripts/speech_to_text_client.py` sends the recorded audio to the server, receives the transcript, optionally copies it to the clipboard, and types the text with `xdotool`.
 
-Tested on Kubuntu 24.04 LTS, Kali 2026.1
+Tested on Kubuntu 24.04 LTS, Kali 2026.1, Ubuntu 24.04 LTS
 
 ## How it works
 

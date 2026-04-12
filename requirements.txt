@@ -1,6 +1,4 @@
-# Python dependencies for Speech-to-Text Key Listener
+# Pip packages for speech_to_text_server.py
 numpy
 soundfile
-pyautogui
-evdev
-faster-whisper 
+faster-whisper

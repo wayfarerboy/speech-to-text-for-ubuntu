@@ -114,9 +114,7 @@ The server supports a primary model for the default path and an optional seconda
 
 The second button is optional, but it is a very practical part of the design.
 
-One common setup is to use one button for English and another button for Czech. In that case, the selected button already tells the system which language is expected, so the correct language code can be passed directly to Whisper. That means the model does not need to rely on language autodetection first.
-
-This makes the workflow more explicit and predictable. One button can simply mean English, the other can mean Czech.
+One common setup is to use one button for English and another button for (for example) Czech. In that case, the selected button already tells the system which language is expected, so the correct language code can be passed directly to Whisper. That means the model does not need to rely on language autodetection first.
 
 It is also useful because different languages may benefit from different model sizes. A smaller model may already be fast and accurate enough for English, while a larger model may give better results for Czech. Since larger models are usually slower, this split lets you keep one fast path and one higher-quality path.
 

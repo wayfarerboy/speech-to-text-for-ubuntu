@@ -23,14 +23,14 @@ Work the **frontier**: any ticket whose blockers are all done. For a purely line
 
 **Blocked by:** 1. Single configuration module
 
-- [ ] `TranscriptionClient` class with `transcribe(path, lang) → str`
-- [ ] `TextTyper` class with `type(text)`
-- [ ] `key_listener.py` uses both instead of subprocess.run to the client script
-- [ ] `scripts/speech_to_text_client.py` becomes a thin CLI wrapper around both modules
-- [ ] TranscriptionClient tests: socket round-trip, missing file raises, error response propagates
-- [ ] TextTyper tests: xdotool args correct, space appended, clipboard selected by env, empty text no-ops
-- [ ] All existing tests pass
-- [ ] End-to-end push-to-talk still works
+- [x] `TranscriptionClient` class with `transcribe(path, lang) → str`
+- [x] `TextTyper` class with `type(text)`
+- [x] `key_listener.py` uses both instead of subprocess.run to the client script
+- [x] `scripts/speech_to_text_client.py` becomes a thin CLI wrapper around both modules
+- [x] TranscriptionClient tests: socket round-trip, missing file raises, error response propagates
+- [x] TextTyper tests: xdotool args correct, space appended, clipboard selected by env, empty text no-ops
+- [x] All existing tests pass
+- [x] End-to-end push-to-talk still works
 
 ## 3. Collapse key listener into PushToTalkSession
 

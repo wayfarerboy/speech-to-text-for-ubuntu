@@ -73,8 +73,11 @@ SECONDARY_LANGUAGE = config.SECONDARY_LANGUAGE
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_DIR = os.path.dirname(_SCRIPT_DIR)  # up from servers/
 
-SPEECHTOTEXT_SCRIPT = os.path.join(_PROJECT_DIR, "scripts", "speech_to_text_client.py")
-INDICATOR_SCRIPT  = os.path.join(_PROJECT_DIR, "scripts", "recording_indicator.py")
+INDICATOR_SCRIPT = os.path.join(_PROJECT_DIR, "scripts", "recording_indicator.py")
+
+# Transcription modules (imported directly instead of via subprocess).
+from transcription_client import TranscriptionClient
+from text_typer import TextTyper
 
 def find_device_by_name(name, retries=10, delay=2):
     """Find /dev/input/event* device matching the given name.
@@ -251,17 +254,12 @@ def main():
                             AUDIO_FILE,
                         )
                         try:
-                            # Pass indicator PID so client can kill it before typing.
-                            cmd = [
-                                "python3",
-                                SPEECHTOTEXT_SCRIPT,
-                                AUDIO_FILE,
-                                "--language",
-                                recording_language,
-                            ]
-                            if indicator_process and indicator_process.poll() is None:
-                                cmd += ["--indicator-pid", str(indicator_process.pid)]
-                            subprocess.run(cmd, env=env, check=True)
+                            t_client = TranscriptionClient()
+                            text = t_client.transcribe(AUDIO_FILE, recording_language)
+                            # Kill indicator before typing.
+                            stop_indicator()
+                            typer = TextTyper()
+                            typer.type(text)
                             elapsed = (
                                 time.monotonic() - recording_started_at
                                 if recording_started_at is not None
@@ -271,7 +269,7 @@ def main():
                                 logging.info("Speech-to-text completed in %.2f seconds", elapsed)
                             else:
                                 logging.info("Speech-to-text completed")
-                        except subprocess.CalledProcessError as e:
+                        except Exception as e:
                             logging.error("Speech-to-text failed: %s", e)
                         finally:
                             stop_indicator()

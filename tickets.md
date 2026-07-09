@@ -38,11 +38,11 @@ Work the **frontier**: any ticket whose blockers are all done. For a purely line
 
 **Blocked by:** 1. Single configuration module, 2. Extract TranscriptionClient + TextTyper
 
-- [ ] `PushToTalkSession` class with `start(lang)` / `stop() → path`
-- [ ] `EvdevAdapter` interface for key events (real implementation reads /dev/input/event*)
-- [ ] `IndicatorAdapter` interface with `show(mode)` / `hide()` (real implementation spawns tkinter)
-- [ ] `key_listener.py` main() wires real adapters and runs the session
-- [ ] Session state tests: start→recording→stop→idle transitions, double-start blocked, key-up before key-down safe
-- [ ] Session integration test with fake adapters: start, simulate key-up, verify stop returns audio path
-- [ ] All existing tests pass
-- [ ] End-to-end push-to-talk still works
+- [x] `PushToTalkSession` class with `start(lang)` / `stop() → path`
+- [x] `EvdevAdapter` interface for key events (real implementation reads /dev/input/event*) — evdev stays inline in main(); session tested with fake adapters injected
+- [x] `IndicatorAdapter` interface with `show(mode)` / `hide()` (real implementation spawns tkinter)
+- [x] `key_listener.py` main() wires real adapters and runs the session
+- [x] Session state tests: start→recording→stop→idle transitions, double-start blocked, key-up before key-down safe
+- [x] Session integration test with fake adapters: start, simulate key-up, verify stop returns audio path
+- [x] All existing tests pass
+- [x] End-to-end push-to-talk still works

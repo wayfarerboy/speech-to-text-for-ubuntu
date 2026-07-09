@@ -27,7 +27,6 @@ This cron job checks every minute if the script is running and if it is not, it 
 
 import logging
 import os
-import signal
 import sys
 import subprocess
 import pwd
@@ -78,6 +77,8 @@ INDICATOR_SCRIPT = os.path.join(_PROJECT_DIR, "scripts", "recording_indicator.py
 # Transcription modules (imported directly instead of via subprocess).
 from transcription_client import TranscriptionClient
 from text_typer import TextTyper
+from push_to_talk_session import PushToTalkSession
+from indicator_adapter import ProcessIndicator
 
 def find_device_by_name(name, retries=10, delay=2):
     """Find /dev/input/event* device matching the given name.
@@ -160,132 +161,66 @@ def main():
     if os.geteuid() != 0:
         logging.error("This script must be run as root")
         sys.exit(1)
-    
+
     # Setup
     env = setup_environment()
     device_path = find_device_by_name(DEVICE_NAME)
     device = InputDevice(device_path)
-    recording_process = None
-    indicator_process = None
-    recording_language = PRIMARY_LANGUAGE
-    recording_started_at = None
-    busy = False  # True from key-down until transcription fully completes
 
-    def stop_indicator():
-        nonlocal indicator_process
-        if indicator_process and indicator_process.poll() is None:
-            indicator_process.terminate()
-            try:
-                indicator_process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                indicator_process.kill()
-            indicator_process = None
-
-    def switch_indicator_to_processing():
-        """Tell indicator to stop spectrogram and show processing animation."""
-        nonlocal indicator_process
-        if indicator_process and indicator_process.poll() is None:
-            indicator_process.send_signal(signal.SIGUSR1)
-
+    # Build key→language map.
+    key_map = {"KEY_F16": PRIMARY_LANGUAGE}
     if SECONDARY_LANGUAGE:
-        logging.info("Listening for KEY_F16/KEY_F17 on %s", device_path)
-    else:
-        logging.info("Listening for KEY_F16 on %s", device_path)
+        key_map["KEY_F17"] = SECONDARY_LANGUAGE
 
-    active_keys = (
-        ("KEY_F16", "KEY_F17")
-        if SECONDARY_LANGUAGE
-        else ("KEY_F16",)
+    # Wire adapters.
+    venv_python = os.path.join(env["HOME"], ".venv", "bin", "python3")
+    indicator = ProcessIndicator(INDICATOR_SCRIPT, venv_python, env)
+
+    session = PushToTalkSession(
+        transcriber=TranscriptionClient(),
+        typer=TextTyper(),
+        indicator=indicator,
+        audio_file=AUDIO_FILE,
+        env=env,
     )
+
+    logging.info("Listening for %s on %s", "/".join(key_map), device_path)
 
     try:
         for event in device.read_loop():
             if event.type == ecodes.EV_KEY:
                 key = categorize(event)
-                
+
                 # Ignore key repeats
                 if key.keystate == 2:
                     continue
-                
-                if key.keycode in active_keys:
-                    if key.keystate == key.key_down and not busy:
-                        busy = True
-                        recording_language = (
-                            SECONDARY_LANGUAGE
-                            if SECONDARY_LANGUAGE and key.keycode == "KEY_F17"
-                            else PRIMARY_LANGUAGE
-                        )
-                        # Start recording
-                        logging.info(
-                            "Starting audio recording (key=%s, audio=%s)",
-                            key.keycode,
-                            AUDIO_FILE,
-                        )
-                        recording_process = subprocess.Popen([
-                            "arecord",
-                            "-f", "S16_LE", # nothing to do with KEY_F16
-                            "-r", "16000",
-                            "-c", "1",
-                            AUDIO_FILE
-                        ], env=env)
-                        logging.info(f"Recording started with PID {recording_process.pid}")
 
-                        # Show recording indicator (use user's venv for sounddevice+numpy)
-                        venv_python = os.path.join(env["HOME"], ".venv", "bin", "python3")
-                        indicator_process = subprocess.Popen(
-                            [venv_python, INDICATOR_SCRIPT],
-                            env=env,
-                        )
-                        logging.info(f"Indicator started with PID {indicator_process.pid}")
-                    
-                    elif key.keystate == key.key_up and busy and recording_process:
-                        # Stop recording and process
-                        logging.info("Stopping audio recording")
-                        recording_process.terminate()
-                        recording_process.wait()
-                        switch_indicator_to_processing()
-                        logging.info(f"Recording saved to {AUDIO_FILE}")
-                        recording_started_at = time.monotonic()
-                        
-                        # Process audio
+                if key.keycode in key_map:
+                    if key.keystate == key.key_down:
+                        language = key_map[key.keycode]
                         logging.info(
-                            "Running speech-to-text (language=%s, audio=%s)",
-                            recording_language,
-                            AUDIO_FILE,
+                            "Starting audio recording (key=%s, language=%s)",
+                            key.keycode,
+                            language,
                         )
+                        session.start(language)
+
+                    elif key.keystate == key.key_up:
+                        logging.info("Stopping audio recording")
+                        started_at = time.monotonic()
                         try:
-                            t_client = TranscriptionClient()
-                            text = t_client.transcribe(AUDIO_FILE, recording_language)
-                            # Kill indicator before typing.
-                            stop_indicator()
-                            typer = TextTyper()
-                            typer.type(text)
-                            elapsed = (
-                                time.monotonic() - recording_started_at
-                                if recording_started_at is not None
-                                else None
+                            session.stop()
+                            elapsed = time.monotonic() - started_at
+                            logging.info(
+                                "Speech-to-text completed in %.2f seconds", elapsed
                             )
-                            if elapsed is not None:
-                                logging.info("Speech-to-text completed in %.2f seconds", elapsed)
-                            else:
-                                logging.info("Speech-to-text completed")
                         except Exception as e:
                             logging.error("Speech-to-text failed: %s", e)
-                        finally:
-                            stop_indicator()
-                            recording_process = None
-                            recording_language = PRIMARY_LANGUAGE
-                            recording_started_at = None
-                            busy = False
-                        
+
     except KeyboardInterrupt:
         logging.info("Shutting down due to keyboard interrupt")
-        if recording_process:
-            recording_process.terminate()
-        stop_indicator()
     except Exception as e:
         logging.error(f"Error: {e}")
-        stop_indicator()
 
 if __name__ == "__main__":
     main()

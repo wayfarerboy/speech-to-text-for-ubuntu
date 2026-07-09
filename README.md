@@ -91,7 +91,7 @@ Open `servers/key_listener.py` and review the configuration values near the top 
 In particular, you will usually want to adjust:
 
 - `DEVICE_NAME`, default `"input-remapper keyboard"` — the key listener auto-discovers the event device by name, so this rarely needs changing
-- `USER`, for example `amara`
+- `USER`, for example `david`
 - `USER_DISPLAY`, usually `:0`
 - `USER_WAYLAND_DISPLAY`, empty for X11 and something like `wayland-0` for Wayland
 - `STATIC_XAUTHORITY`, if needed

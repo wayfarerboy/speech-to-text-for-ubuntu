@@ -7,7 +7,7 @@ override a value can monkeypatch the attribute on this module directly.
 # ── Key listener ──────────────────────────────────────────────────────
 DEVICE_NAME = "input-remapper keyboard"
 AUDIO_FILE = "/tmp/stt_recorded_audio.wav"
-USER = "amara"
+USER = ""  # Set to your desktop username
 USER_DISPLAY = ":0"
 USER_WAYLAND_DISPLAY = "wayland-0"
 STATIC_XAUTHORITY = ""

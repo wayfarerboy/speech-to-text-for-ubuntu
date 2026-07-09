@@ -19,7 +19,7 @@ Running as a regular user will result in permission errors.
 
 To automatically start this key listener on boot, you can use the following crontab entry for root:
 
-* * * * * ps -ef | grep "speech-to-text-for-ubuntu/servers/key_listener.py" | grep -v grep > /dev/null || /usr/bin/python3 /home/david/speech-to-text-for-ubuntu/servers/key_listener.py > /dev/null 2>&1 &
+* * * * * ps -ef | grep "speech-to-text-for-ubuntu/servers/key_listener.py" | grep -v grep > /dev/null || /usr/bin/python3 /home/user/speech-to-text-for-ubuntu/servers/key_listener.py > /dev/null 2>&1 &
 
 This cron job checks every minute if the script is running and if it is not, it starts the script.
 

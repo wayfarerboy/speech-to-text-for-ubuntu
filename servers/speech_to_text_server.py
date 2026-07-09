@@ -16,16 +16,16 @@ Requirements:
 1) sudo apt install libsndfile1
 
 2) Create a Python virtual environment and install packages. The examples use 
-/home/user/venv; substitute your venv path.
+/home/amara/venv; substitute your venv path.
 
-  python3 -m venv /home/user/venv
-  /home/user/venv/bin/pip install -r /home/user/speech-to-text-for-ubuntu/requirements.txt
+  python3 -m venv /home/amara/venv
+  /home/amara/venv/bin/pip install -r /home/amara/speech-to-text-for-ubuntu/requirements.txt
 
 Automatic startup on boot:
 To automatically start this server on boot, you can use the following crontab entry
-for the user running the display (e.g. user):
+for the user running the display (e.g. amara):
 
-* * * * * ps -ef | grep "speech-to-text-for-ubuntu/servers/speech_to_text_server.py" | grep -v grep > /dev/null || /home/user/venv/bin/python3 /home/user/speech-to-text-for-ubuntu/servers/speech_to_text_server.py > /dev/null 2>&1 &
+* * * * * ps -ef | grep "speech-to-text-for-ubuntu/servers/speech_to_text_server.py" | grep -v grep > /dev/null || /home/amara/venv/bin/python3 /home/amara/speech-to-text-for-ubuntu/servers/speech_to_text_server.py > /dev/null 2>&1 &
 
 This cron job checks every minute if the script is running and if it is not, it starts the script.
 """

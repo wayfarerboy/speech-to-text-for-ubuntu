@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Local markdown files under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+[GitHub Issues](https://github.com/wayfarerboy/speech-to-text-for-ubuntu/issues) with `ready-for-agent` label. Planning artifacts (PRDs, ADRs, maps) under `.scratch/`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

@@ -1,30 +1,25 @@
-# Issue tracker: Local Markdown
+# Issue tracker: GitHub Issues
 
-Issues and PRDs for this repo live as markdown files in `.scratch/`.
+Implementation issues live on [GitHub Issues](https://github.com/wayfarerboy/speech-to-text-for-ubuntu/issues) with the `ready-for-agent` label.
 
-## Conventions
+## Planning artifacts
+
+PRDs, ADRs, domain research, and wayfinding maps live as local markdown under `.scratch/`:
 
 - One feature per directory: `.scratch/<feature-slug>/`
 - The PRD is `.scratch/<feature-slug>/PRD.md`
-- Implementation issues are `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`
-- Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md` for the role strings)
-- Comments and conversation history append to the bottom of the file under a `## Comments` heading
+- Wayfinding map: `.scratch/<feature-slug>/map.md`
 
 ## When a skill says "publish to the issue tracker"
 
-Create a new file under `.scratch/<feature-slug>/` (creating the directory if needed).
+Create a GitHub issue on `wayfarerboy/speech-to-text-for-ubuntu` with the `ready-for-agent` label. Include blocking edges in the body under a `## Blocked by` heading.
+
+Also create the corresponding planning files under `.scratch/<feature-slug>/` (PRD, map, and per-ticket `.md` files for local reference).
 
 ## When a skill says "fetch the relevant ticket"
 
-Read the file at the referenced path. The user will normally pass the path or the issue number directly.
+Use `gh issue view <number>` or read the local `.scratch/<feature-slug>/issues/<NN>-<slug>.md` file.
 
-## Wayfinding operations
+## Triage labels
 
-Used by `/wayfinder`. The **map** is a file with one **child** file per ticket.
-
-- **Map**: `.scratch/<effort>/map.md` — the Notes / Decisions-so-far / Fog body.
-- **Child ticket**: `.scratch/<effort>/issues/NN-<slug>.md`, numbered from `01`, with the question in the body. A `Type:` line records the ticket type (`research`/`prototype`/`grilling`/`task`); a `Status:` line records `claimed`/`resolved`.
-- **Blocking**: a `Blocked by: NN, NN` line near the top. A ticket is unblocked when every file it lists is `resolved`.
-- **Frontier**: scan `.scratch/<effort>/issues/` for files that are open, unblocked, and unclaimed; first by number wins.
-- **Claim**: set `Status: claimed` and save before any work.
-- **Resolve**: append the answer under an `## Answer` heading, set `Status: resolved`, then append a context pointer (gist + link) to the map's Decisions-so-far in `map.md`.
+See `triage-labels.md` for the canonical label vocabulary.

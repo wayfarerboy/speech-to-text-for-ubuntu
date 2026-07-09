@@ -24,21 +24,32 @@ import argparse
 import json
 import logging
 import os
+import signal
 import socket
 import subprocess
 import sys
 
-SOCKET_PATH = "/tmp/stt_server.sock"
+# Ensure repo root is on sys.path so import config works regardless of
+# how this script is launched (full path, relative path, etc.).
+import sys as _sys
+import os as _os
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+import config
 
-# Non-empty (e.g. "yes") = copy to clipboard before typing; "" = off.
-COPY_TO_CLIPBOARD = "yes"
+SOCKET_PATH = config.SOCKET_PATH
+COPY_TO_CLIPBOARD = config.COPY_TO_CLIPBOARD
+
+try:
+    fh = logging.FileHandler("/tmp/stt_client.log")
+except PermissionError:
+    fh = logging.NullHandler()
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s: %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("/tmp/stt_client.log")
+        fh
     ]
 )
 
@@ -108,6 +119,29 @@ def _copy_to_clipboard(text):
         logging.warning("Clipboard copy failed (exit %s)", e.returncode)
         return False
 
+def release_modifiers():
+    """Release all modifier keys — belt-and-suspenders after xdotool.
+
+    xdotool's --clearmodifiers is unreliable on XWayland/Wayland, so we
+    explicitly send key-up for every modifier that might have gotten stuck.
+    """
+    modifiers = [
+        "Control_L", "Control_R",
+        "Alt_L", "Alt_R",
+        "Shift_L", "Shift_R",
+        "Super_L", "Super_R",
+        "Meta_L", "Meta_R",
+    ]
+    try:
+        subprocess.run(
+            ["xdotool", "keyup"] + modifiers,
+            timeout=3,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass  # best-effort, never block
+
 def type_text(text):
     if text:
         text_to_type = text + " "
@@ -121,6 +155,7 @@ def type_text(text):
             capture_output=True,
             text=True,
         )
+        release_modifiers()
 
 def main():
     parser = argparse.ArgumentParser(
@@ -131,6 +166,12 @@ def main():
         "--language",
         default="en",
         help="ISO 639-1 code (e.g. en, cs),  default: en",
+    )
+    parser.add_argument(
+        "--indicator-pid",
+        type=int,
+        default=None,
+        help="PID of recording indicator to kill before typing.",
     )
     args = parser.parse_args()
     language = (args.language or "en").strip().lower()
@@ -148,10 +189,19 @@ def main():
             sys.exit(1)
 
         text = resp.get("text", "").strip()
+
+        # Kill indicator before typing (so it disappears before text appears).
+        if args.indicator_pid:
+            try:
+                os.kill(args.indicator_pid, signal.SIGTERM)
+            except OSError:
+                pass
+
         type_text(text)
         logging.info("Done")
 
     except Exception as e:
+        release_modifiers()
         logging.error(f"Client failed: {e}")
         sys.exit(1)
 

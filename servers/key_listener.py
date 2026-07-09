@@ -27,6 +27,7 @@ This cron job checks every minute if the script is running and if it is not, it 
 
 import logging
 import os
+import signal
 import sys
 import subprocess
 import pwd
@@ -49,47 +50,55 @@ except ImportError:
     print("Error: evdev library not found")
     sys.exit(1)
 
-# Configuration
-# To choose the correct event ID for your device, use the "evtest" tool:
-# Run "sudo evtest" in a terminal.
-# If you used input-remapper then it can look like this: 
-# /dev/input/event15:     input-remapper keyboard
-DEVICE_PATH = "/dev/input/event15"
+# Configuration — all configurable values live in config.py.
+# Ensure repo root is on sys.path so import config works regardless of
+# how this script is launched (systemd, full path, relative path, etc.).
+import sys as _sys
+import os as _os
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+import config
 
-# Just a temporary file to store the audio. 
-AUDIO_FILE = "/tmp/stt_recorded_audio.wav"
+# Re-exported for test visibility (tests reference e.g. kl_mod.USER_DISPLAY).
+DEVICE_NAME = config.DEVICE_NAME
+AUDIO_FILE = config.AUDIO_FILE
+USER = config.USER
+USER_DISPLAY = config.USER_DISPLAY
+USER_WAYLAND_DISPLAY = config.USER_WAYLAND_DISPLAY
+STATIC_XAUTHORITY = config.STATIC_XAUTHORITY
+PROCESS_FOR_XAUTH_COPY = config.PROCESS_FOR_XAUTH_COPY
+PRIMARY_LANGUAGE = config.PRIMARY_LANGUAGE
+SECONDARY_LANGUAGE = config.SECONDARY_LANGUAGE
 
-# The user who runs the X server
-USER = "david"
+# Paths derived from this script's location (no hardcoded home directories).
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_DIR = os.path.dirname(_SCRIPT_DIR)  # up from servers/
 
-# The user's display, use "echo $DISPLAY;" to check
-USER_DISPLAY = ":0"
+SPEECHTOTEXT_SCRIPT = os.path.join(_PROJECT_DIR, "scripts", "speech_to_text_client.py")
+INDICATOR_SCRIPT  = os.path.join(_PROJECT_DIR, "scripts", "recording_indicator.py")
 
-# The user's Wayland display, use "echo $WAYLAND_DISPLAY;" to check 
-# It is empty if you are running (legacy) X11 session 
-# It is non-empty if you are running (new) Wayland session
-USER_WAYLAND_DISPLAY = ""
-
-# Check using: echo $XAUTHORITY;
-# If the Xauthority filename is static, e.g. ~/.Xauthority and NOT something like /tmp/xauth_AVqvHc 
-# which contains random string and hence is dynamic then define it here.
-# If the Xauthority filename is dynamic then set this variable to empty string.
-STATIC_XAUTHORITY = ""
-
-# This variable is irrelevant and not used when STATIC_XAUTHORITY is non-empty
-# We will get XAUTHORITY variable from a running process (e.g., /usr/bin/ksmserver) owned by USER.
-# Find a process that is always running in single instance and owned by USER and has 
-# XAUTHORITY variable defined in its environment (see /proc/{pid}/environ)
-PROCESS_FOR_XAUTH_COPY = "/usr/bin/ksmserver" # for KDE, /usr/libexec/gsd-media-keys for GNOME
-
-# The script that will process the stored audio and generate text from it. 
-SPEECHTOTEXT_SCRIPT = "/home/david/speech-to-text-for-ubuntu/scripts/speech_to_text_client.py"
-
-# PRIMARY_LANGUAGE on KEY_F16; 
-# optional SECONDARY_LANGUAGE on KEY_F17.
-# Leave SECONDARY_LANGUAGE empty ("") to listen only for KEY_F16.
-PRIMARY_LANGUAGE = "en"
-SECONDARY_LANGUAGE = "cs"
+def find_device_by_name(name, retries=10, delay=2):
+    """Find /dev/input/event* device matching the given name.
+    
+    Retries because input-remapper may not have created the virtual device yet
+    when this service starts.
+    """
+    import glob
+    for attempt in range(retries):
+        for path in sorted(glob.glob("/dev/input/event*")):
+            try:
+                with open(f"/sys/class/input/{os.path.basename(path)}/device/name") as f:
+                    if f.read().strip() == name:
+                        logging.info("Found device '%s' at %s", name, path)
+                        return path
+            except (IOError, OSError):
+                continue
+        if attempt < retries - 1:
+            logging.warning(
+                "Device '%s' not found, retrying in %ds (%d/%d)",
+                name, delay, attempt + 1, retries,
+            )
+            time.sleep(delay)
+    raise FileNotFoundError(f"Device '{name}' not found after {retries} attempts")
 
 def setup_environment():
     pw_record = pwd.getpwnam(USER)
@@ -100,6 +109,8 @@ def setup_environment():
         "XDG_RUNTIME_DIR": f"/run/user/{pw_record.pw_uid}",
         "DISPLAY": f"{USER_DISPLAY}",
         "WAYLAND_DISPLAY": f"{USER_WAYLAND_DISPLAY}",
+        "PULSE_SERVER": f"unix:/run/user/{pw_record.pw_uid}/pulse/native",
+        "PULSE_RUNTIME_PATH": f"/run/user/{pw_record.pw_uid}/pulse",
     })
 
     # We set env["XAUTHORITY"]
@@ -149,15 +160,34 @@ def main():
     
     # Setup
     env = setup_environment()
-    device = InputDevice(DEVICE_PATH)
+    device_path = find_device_by_name(DEVICE_NAME)
+    device = InputDevice(device_path)
     recording_process = None
+    indicator_process = None
     recording_language = PRIMARY_LANGUAGE
     recording_started_at = None
+    busy = False  # True from key-down until transcription fully completes
+
+    def stop_indicator():
+        nonlocal indicator_process
+        if indicator_process and indicator_process.poll() is None:
+            indicator_process.terminate()
+            try:
+                indicator_process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                indicator_process.kill()
+            indicator_process = None
+
+    def switch_indicator_to_processing():
+        """Tell indicator to stop spectrogram and show processing animation."""
+        nonlocal indicator_process
+        if indicator_process and indicator_process.poll() is None:
+            indicator_process.send_signal(signal.SIGUSR1)
 
     if SECONDARY_LANGUAGE:
-        logging.info("Listening for KEY_F16/KEY_F17 on %s", DEVICE_PATH)
+        logging.info("Listening for KEY_F16/KEY_F17 on %s", device_path)
     else:
-        logging.info("Listening for KEY_F16 on %s", DEVICE_PATH)
+        logging.info("Listening for KEY_F16 on %s", device_path)
 
     active_keys = (
         ("KEY_F16", "KEY_F17")
@@ -175,7 +205,8 @@ def main():
                     continue
                 
                 if key.keycode in active_keys:
-                    if key.keystate == key.key_down and recording_process is None:
+                    if key.keystate == key.key_down and not busy:
+                        busy = True
                         recording_language = (
                             SECONDARY_LANGUAGE
                             if SECONDARY_LANGUAGE and key.keycode == "KEY_F17"
@@ -188,7 +219,6 @@ def main():
                             AUDIO_FILE,
                         )
                         recording_process = subprocess.Popen([
-                            "sudo", "-u", USER, "-E",
                             "arecord",
                             "-f", "S16_LE", # nothing to do with KEY_F16
                             "-r", "16000",
@@ -196,12 +226,21 @@ def main():
                             AUDIO_FILE
                         ], env=env)
                         logging.info(f"Recording started with PID {recording_process.pid}")
+
+                        # Show recording indicator (use user's venv for sounddevice+numpy)
+                        venv_python = os.path.join(env["HOME"], ".venv", "bin", "python3")
+                        indicator_process = subprocess.Popen(
+                            [venv_python, INDICATOR_SCRIPT],
+                            env=env,
+                        )
+                        logging.info(f"Indicator started with PID {indicator_process.pid}")
                     
-                    elif key.keystate == key.key_up and recording_process:
+                    elif key.keystate == key.key_up and busy and recording_process:
                         # Stop recording and process
                         logging.info("Stopping audio recording")
                         recording_process.terminate()
                         recording_process.wait()
+                        switch_indicator_to_processing()
                         logging.info(f"Recording saved to {AUDIO_FILE}")
                         recording_started_at = time.monotonic()
                         
@@ -212,14 +251,17 @@ def main():
                             AUDIO_FILE,
                         )
                         try:
-                            subprocess.run([
-                                "sudo", "-u", USER, "-E",
+                            # Pass indicator PID so client can kill it before typing.
+                            cmd = [
                                 "python3",
                                 SPEECHTOTEXT_SCRIPT,
                                 AUDIO_FILE,
                                 "--language",
                                 recording_language,
-                            ], env=env, check=True)
+                            ]
+                            if indicator_process and indicator_process.poll() is None:
+                                cmd += ["--indicator-pid", str(indicator_process.pid)]
+                            subprocess.run(cmd, env=env, check=True)
                             elapsed = (
                                 time.monotonic() - recording_started_at
                                 if recording_started_at is not None
@@ -232,16 +274,20 @@ def main():
                         except subprocess.CalledProcessError as e:
                             logging.error("Speech-to-text failed: %s", e)
                         finally:
+                            stop_indicator()
                             recording_process = None
                             recording_language = PRIMARY_LANGUAGE
                             recording_started_at = None
+                            busy = False
                         
     except KeyboardInterrupt:
         logging.info("Shutting down due to keyboard interrupt")
         if recording_process:
             recording_process.terminate()
+        stop_indicator()
     except Exception as e:
         logging.error(f"Error: {e}")
+        stop_indicator()
 
 if __name__ == "__main__":
     main()

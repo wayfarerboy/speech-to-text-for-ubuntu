@@ -42,37 +42,22 @@ import numpy as np
 import soundfile as sf
 from faster_whisper import WhisperModel
 
-SOCKET_PATH = "/tmp/stt_server.sock"
+# Ensure repo root is on sys.path so import config works regardless of
+# how this script is launched (systemd, full path, relative path, etc.).
+import sys as _sys
+import os as _os
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+import config
 
-PRIMARY_LANGUAGE_MODEL = "small"
-# Set to None (or "") to load only the primary model; 
-# all requests then use PRIMARY_LANGUAGE_MODEL.
-SECONDARY_LANGUAGE_MODEL = "medium"  # e.g. "large-v3-turbo"
-# When SECONDARY_LANGUAGE_MODEL is set, these language codes use it; 
-# all others use the primary model.
-SECONDARY_MODEL_LANGUAGES = ("cs",)
-
-# WhisperModel inference precision: int8 uses 8-bit quantized math for
-# lower memory use and faster CPU inference than default float32
-# with minor quality tradeoff.
-COMPUTE_TYPE = "int8"
-
-# faster-whisper CPU settings. 
-# Number of CPUs: cat /proc/cpuinfo | grep processor | wc -l
-# Try setting to half of your CPUs (16 CPUs -> set to 8)
-WHISPER_CPU_THREADS = 8
-
-# Optional text passed to Whisper to bias style (e.g. cleaner transcript, target language).
-INITIAL_PROMPT_EN = (
-    "Clean transcription style. Remove filler words such as um, uh, like, "
-    "you know, I mean. Remove obvious repeated words and false starts. "
-    "Keep the intended sentence natural and concise."
-)
-INITIAL_PROMPT_CS = (
-    "Použij čistý styl přepisu. Odstraň vyplňová slova jako ehm, hmm, "
-    "jakože, víš a podobně. Odstraň zjevně opakovaná slova a falešné začátky. "
-    "Zachovej zamýšlenou větu přirozenou a stručnou."
-)
+# Re-exported for test visibility.
+SOCKET_PATH = config.SOCKET_PATH
+PRIMARY_LANGUAGE_MODEL = config.PRIMARY_LANGUAGE_MODEL
+SECONDARY_LANGUAGE_MODEL = config.SECONDARY_LANGUAGE_MODEL
+SECONDARY_MODEL_LANGUAGES = config.SECONDARY_MODEL_LANGUAGES
+COMPUTE_TYPE = config.COMPUTE_TYPE
+WHISPER_CPU_THREADS = config.WHISPER_CPU_THREADS
+INITIAL_PROMPT_EN = config.INITIAL_PROMPT_EN
+INITIAL_PROMPT_CS = config.INITIAL_PROMPT_CS
 
 logging.basicConfig(
     level=logging.INFO,

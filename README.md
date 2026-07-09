@@ -50,20 +50,20 @@ sudo apt install -y \
 
 `xdotool` is used to type the transcript into the focused window. `xclip` is used for clipboard copy on X11, while `wl-clipboard` provides clipboard support on Wayland. `input-remapper` is strongly recommended for creating a reliable trigger key such as `F16`, and `evtest` helps you find the correct input device path. `python3-tk` is required by the recording indicator overlay. `libsndfile1` is required by the Python `soundfile` package.
 
-Clone the repository. The examples below assume the project is stored in `/home/amara/speech-to-text-for-ubuntu` and the virtual environment is `/home/amara/venv`. If your username or paths differ, adjust the configuration values in the scripts accordingly.
+Clone the repository. The examples below assume the project is stored in `~/speech-to-text-for-ubuntu` and the virtual environment is `~/venv`. If your username or paths differ, adjust the configuration values in the scripts accordingly.
 
 ```bash
-cd /home/amara
+cd ~
 git clone https://github.com/CDNsun/speech-to-text-for-ubuntu.git
-cd /home/amara/speech-to-text-for-ubuntu
+cd ~/speech-to-text-for-ubuntu
 ```
 
 Then create a Python virtual environment and install the Python dependencies from `requirements.txt`:
 
 ```bash
-python3 -m venv /home/amara/venv
-/home/amara/venv/bin/pip install --upgrade pip
-/home/amara/venv/bin/pip install -r /home/amara/speech-to-text-for-ubuntu/requirements.txt
+python3 -m venv ~/venv
+~/venv/bin/pip install --upgrade pip
+~/venv/bin/pip install -r ~/speech-to-text-for-ubuntu/requirements.txt
 ```
 
 The Python packages used by the project are `numpy`, `soundfile`, `faster-whisper`, and `sounddevice`.
@@ -159,7 +159,7 @@ The indicator is click-through (passes all mouse events to windows underneath), 
 Start the speech-to-text server as your normal desktop user:
 
 ```bash
-/home/amara/venv/bin/python3 /home/amara/speech-to-text-for-ubuntu/servers/speech_to_text_server.py
+~/venv/bin/python3 ~/speech-to-text-for-ubuntu/servers/speech_to_text_server.py
 ```
 
 This starts a Unix socket server at:
@@ -171,7 +171,7 @@ This starts a Unix socket server at:
 Then start the key listener as root:
 
 ```bash
-sudo python3 /home/amara/speech-to-text-for-ubuntu/servers/key_listener.py
+sudo python3 ~/speech-to-text-for-ubuntu/servers/key_listener.py
 ```
 
 Once both processes are running, focus the text field where you want the transcript to appear, press and hold your trigger key, speak, and release the key. The recorded audio is transcribed and the resulting text is typed into the currently focused window.
@@ -235,7 +235,7 @@ section, then log out and back in.
 Ensure `sounddevice` is installed in the project's virtual environment:
 
 ```bash
-/home/amara/venv/bin/pip install sounddevice
+~/venv/bin/pip install sounddevice
 ```
 
 ### Key press not detected

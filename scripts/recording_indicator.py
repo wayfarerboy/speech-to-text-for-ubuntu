@@ -2,6 +2,13 @@
 """
 Recording indicator with live audio spectrogram.
 
+Persistent process — starts hidden, controlled by signals:
+
+    SIGUSR1  → show recording spectrogram (deiconify, start audio)
+    SIGUSR2  → switch to processing animation (stop audio, animated bars)
+    SIGTERM  → hide window (withdraw, stop audio, reset state)
+    SIGINT   → exit completely (used by parent to shut down)
+
 Uses tkinter (reliable no-decorations via override-redirect) with
 window-level alpha for semi-transparent background.  Rainbow FFT bars
 drawn on a dark translucent backdrop.
@@ -30,7 +37,6 @@ FPS = 30
 ALPHA = 0.6              # whole-window opacity
 SMOOTH = 0.55            # EMA smoothing (higher = more responsive)
 DB_FLOOR = -40           # dB floor for log scaling
-PROCESS_SPEED = 2.0      # processing-wave scroll speed
 
 # ── audio ring-buffer ─────────────────────────────────────────────────
 _audio_buffer = np.zeros(BLOCK_SIZE, dtype=np.float32)
@@ -49,6 +55,7 @@ def audio_callback(indata, frames, time_info, status):
 
 def start_audio():
     global _stream
+    stop_audio()
     try:
         _stream = sd.InputStream(
             samplerate=SAMPLE_RATE,
@@ -73,6 +80,14 @@ def stop_audio():
         _stream = None
 
 
+def reset_audio():
+    global _audio_buffer, _prev_mags
+    stop_audio()
+    _audio_buffer = np.zeros(BLOCK_SIZE, dtype=np.float32)
+    global _prev_mags
+    _prev_mags = None
+
+
 # ── rainbow colour map ────────────────────────────────────────────────
 def freq_to_color(i: int, total: int) -> str:
     hue = 0.66 - (i / max(total - 1, 1)) * 0.66
@@ -95,6 +110,7 @@ def freq_to_color(i: int, total: int) -> str:
 
 
 _prev_mags = None
+
 
 def smooth_mags(mags: np.ndarray, alpha: float = SMOOTH) -> np.ndarray:
     global _prev_mags
@@ -152,14 +168,16 @@ def main():
     root.configure(bg="black")
     root.attributes("-alpha", ALPHA)
 
-    # Position
+    # Position — compute geometry once at startup (monitor may change
+    # between sessions, but re-detecting is slow; accept staleness).
     root.update_idletasks()
     mx, my, mw, mh = get_active_monitor_geometry(root)
-    root.withdraw()
     x = mx + (mw - WIDTH) // 2
     y = my + mh - HEIGHT - Y_OFFSET
     root.geometry(f"{WIDTH}x{HEIGHT}+{x}+{y}")
-    root.deiconify()
+
+    # Start hidden — wait for SIGUSR1 to appear.
+    root.withdraw()
 
     # Canvas
     canvas = tk.Canvas(
@@ -168,15 +186,13 @@ def main():
     )
     canvas.pack(fill="both", expand=True)
 
-    # Mode: "recording" → live spectrogram; "processing" → animated wave
     mode = "recording"
     frame_count = 0
 
-    # Start audio
-    start_audio()
-
     def draw():
         nonlocal frame_count
+        if _quitting:
+            return
         frame_count += 1
 
         canvas.delete("all")
@@ -251,21 +267,55 @@ def main():
                 canvas.create_rectangle(x0, y_top, x1, mid_y, fill=color, outline="", width=0)
                 canvas.create_rectangle(x0, mid_y, x1, y_bot, fill=color, outline="", width=0)
 
-        root.after(1000 // FPS, draw)
+        after_id = root.after(1000 // FPS, draw)
 
+    _quitting = False
     root.after(100, draw)
 
-    def switch_to_processing(*_):
-        nonlocal mode
+    # ── persistent lifecycle signals ──────────────────────────────
+
+    def show_recording(*_):
+        """SIGUSR1: show window, start audio, recording mode."""
+        nonlocal mode, frame_count
+        mode = "recording"
+        frame_count = 0
+        global _prev_mags
+        _prev_mags = None
+        # Recompute position (mouse may have moved since boot).
+        mx, my, mw, mh = get_active_monitor_geometry(root)
+        x = mx + (mw - WIDTH) // 2
+        y = my + mh - HEIGHT - Y_OFFSET
+        root.geometry(f"{WIDTH}x{HEIGHT}+{x}+{y}")
+        start_audio()
+        root.deiconify()
+
+    def show_processing(*_):
+        """SIGUSR2: switch to processing animation, stop audio."""
+        nonlocal mode, frame_count
         mode = "processing"
+        frame_count = 0
         stop_audio()
 
-    def on_term(*_):
+    def hide(*_):
+        """SIGTERM: hide window, stop audio, reset state."""
+        nonlocal mode, frame_count
+        root.withdraw()
+        reset_audio()
+        mode = "recording"
+        frame_count = 0
+
+    def quit_indicator(*_):
+        """SIGINT: exit the process completely."""
+        nonlocal _quitting
+        _quitting = True
         stop_audio()
         root.destroy()
 
-    signal.signal(signal.SIGUSR1, switch_to_processing)
-    signal.signal(signal.SIGTERM, on_term)
+    signal.signal(signal.SIGUSR1, show_recording)
+    signal.signal(signal.SIGUSR2, show_processing)
+    signal.signal(signal.SIGTERM, hide)
+    signal.signal(signal.SIGINT, quit_indicator)
+
     root.mainloop()
     stop_audio()
 

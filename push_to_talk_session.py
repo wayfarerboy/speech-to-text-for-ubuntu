@@ -3,7 +3,19 @@
 Interface: ``start(language)`` / ``stop() -> str``.
 """
 
+import os
+import pwd
 import subprocess
+
+
+def _popen_user_kwargs(run_as_user):
+    """Return ``dict(user=uid, group=gid)`` if running as root and
+    *run_as_user* is set; otherwise an empty dict.
+    """
+    if run_as_user and os.geteuid() == 0:
+        pw = pwd.getpwnam(run_as_user)
+        return {"user": pw.pw_uid, "group": pw.pw_gid}
+    return {}
 
 
 class PushToTalkSession:
@@ -11,14 +23,19 @@ class PushToTalkSession:
 
     Injected dependencies (transcriber, typer, indicator) are called
     at the right moments; tests inject fakes to verify the state machine.
+
+    If *run_as_user* is provided and the current process is root,
+    arecord is spawned as that user (avoids polkit dialogs for audio).
     """
 
-    def __init__(self, transcriber, typer, indicator, audio_file, env):
+    def __init__(self, transcriber, typer, indicator, audio_file, env,
+                 run_as_user=None):
         self._transcriber = transcriber
         self._typer = typer
         self._indicator = indicator
         self._audio_file = audio_file
         self._env = env
+        self._run_as_user = run_as_user
 
         self._state = "idle"
         self._recording_process = None
@@ -39,6 +56,12 @@ class PushToTalkSession:
         self._current_language = language
         self._state = "recording"
         self._indicator.show("recording")
+        # Remove stale audio file — arecord runs as a different user
+        # and can't overwrite a root-owned file.
+        try:
+            os.remove(self._audio_file)
+        except FileNotFoundError:
+            pass
         self._recording_process = subprocess.Popen(
             [
                 "arecord",
@@ -48,6 +71,7 @@ class PushToTalkSession:
                 self._audio_file,
             ],
             env=self._env,
+            **_popen_user_kwargs(self._run_as_user),
         )
         return True
 

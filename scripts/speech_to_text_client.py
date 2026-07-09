@@ -9,8 +9,6 @@ client manually against any audio path the server can read.
 
 import argparse
 import logging
-import os
-import signal
 import sys
 
 # Ensure repo root is on sys.path so imports work regardless of launch method.
@@ -46,12 +44,6 @@ def main():
         default="en",
         help="ISO 639-1 code (e.g. en, cs),  default: en",
     )
-    parser.add_argument(
-        "--indicator-pid",
-        type=int,
-        default=None,
-        help="PID of recording indicator to kill before typing.",
-    )
     args = parser.parse_args()
     language = (args.language or "en").strip().lower()
 
@@ -67,13 +59,6 @@ def main():
 
     try:
         text = t_client.transcribe(args.audio_file, language=language)
-
-        # Kill indicator before typing (so it disappears before text appears).
-        if args.indicator_pid:
-            try:
-                os.kill(args.indicator_pid, signal.SIGTERM)
-            except OSError:
-                pass
 
         typer.type(text)
         logging.info("Done")

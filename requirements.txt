@@ -1,4 +1,5 @@
-# Pip packages for speech_to_text_server.py
+# Pip packages for speech_to_text_server.py and recording_indicator.py
 numpy
 soundfile
 faster-whisper
+sounddevice

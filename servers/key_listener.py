@@ -27,7 +27,6 @@ This cron job checks every minute if the script is running and if it is not, it 
 
 import logging
 import os
-import signal
 import sys
 import subprocess
 import pwd
@@ -165,9 +164,6 @@ def main():
 
     # Setup
     env = setup_environment()
-    # Update the process environment so subprocesses (xdotool, etc.)
-    # inherit DISPLAY / XAUTHORITY / PULSE_* from the user session.
-    os.environ.update(env)
     device_path = find_device_by_name(DEVICE_NAME)
     device = InputDevice(device_path)
 
@@ -178,8 +174,7 @@ def main():
 
     # Wire adapters.
     venv_python = os.path.join(env["HOME"], ".venv", "bin", "python3")
-    indicator = ProcessIndicator(INDICATOR_SCRIPT, venv_python, env,
-                                 run_as_user=USER)
+    indicator = ProcessIndicator(INDICATOR_SCRIPT, venv_python, env)
 
     session = PushToTalkSession(
         transcriber=TranscriptionClient(),
@@ -187,16 +182,7 @@ def main():
         indicator=indicator,
         audio_file=AUDIO_FILE,
         env=env,
-        run_as_user=USER,
     )
-
-    # ── graceful shutdown on SIGTERM ──────────────────────────────
-    def _on_sigterm(signum, frame):
-        logging.info("Received SIGTERM — shutting down")
-        indicator.close()
-        os._exit(0)
-
-    signal.signal(signal.SIGTERM, _on_sigterm)
 
     logging.info("Listening for %s on %s", "/".join(key_map), device_path)
 
@@ -235,9 +221,6 @@ def main():
         logging.info("Shutting down due to keyboard interrupt")
     except Exception as e:
         logging.error(f"Error: {e}")
-    finally:
-        indicator.close()
-        logging.info("Indicator closed")
 
 if __name__ == "__main__":
     main()

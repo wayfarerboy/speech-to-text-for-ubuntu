@@ -6,16 +6,12 @@ class FakeIndicator:
 
     def __init__(self):
         self.calls = []
-        self.closed = False
 
     def show(self, mode):
         self.calls.append(("show", mode))
 
     def hide(self):
         self.calls.append(("hide",))
-
-    def close(self):
-        self.closed = True
 
 
 class FakeTranscriber:

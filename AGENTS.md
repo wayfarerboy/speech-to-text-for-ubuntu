@@ -1,3 +1,18 @@
+### Deployment
+
+Use `pkexec` for privileged operations — `sudo` fails in agent contexts (no TTY). `pkexec` brings up a GUI auth dialog.
+
+```bash
+# Restart system services
+pkexec systemctl restart stt-keylistener.service
+
+# Deploy / redeploy all services (idempotent)
+bash deploy/deploy-services.sh  # user service (no sudo needed)
+pkexec systemctl restart stt-keylistener.service  # system service
+```
+
+The deploy script rewrites systemd unit files and restarts everything. Safe to re-run.
+
 ## Agent skills
 
 ### Issue tracker

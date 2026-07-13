@@ -247,7 +247,7 @@ Ensure `sounddevice` is installed in the project's virtual environment:
 
 ## Testing
 
-A pytest suite covers the server, coordinator, key listener, and supporting modules (150 tests).
+A pytest suite covers the server, coordinator, key listener, and supporting modules (146 tests).
 
 ```bash
 pip install pytest

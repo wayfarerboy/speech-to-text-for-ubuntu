@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # deploy-services.sh — install and enable systemd services for speech-to-text.
 #
-# Safe to re-run (idempotent).  Run as your normal user — sudo is prompted
-# for the system-level key-listener unit.
+# Safe to re-run (idempotent).  Run as your normal user — pkexec is used
+# for the system-level key-listener unit (brings up a GUI auth dialog).
 #
 # Usage:
 #   chmod +x deploy/deploy-services.sh
@@ -53,10 +53,11 @@ echo "==> stt-server.service enabled and started"
 SYSTEMD_SYSTEM_DIR="/etc/systemd/system"
 SYSTEM_PYTHON="/usr/bin/python3"
 
-sudo tee "$SYSTEMD_SYSTEM_DIR/stt-keylistener.service" > /dev/null <<EOF
+pkexec tee "$SYSTEMD_SYSTEM_DIR/stt-keylistener.service" > /dev/null <<EOF
 [Unit]
 Description=Speech-to-text key listener
-After=multi-user.target
+Wants=graphical.target
+After=graphical.target
 
 [Service]
 ExecStart=$SYSTEM_PYTHON $PROJECT_DIR/servers/key_listener.py
@@ -69,8 +70,8 @@ EOF
 
 echo "==> Wrote $SYSTEMD_SYSTEM_DIR/stt-keylistener.service"
 
-sudo systemctl daemon-reload
-sudo systemctl enable --now stt-keylistener.service
+pkexec systemctl daemon-reload
+pkexec systemctl enable --now stt-keylistener.service
 echo "==> stt-keylistener.service enabled and started"
 
 echo ""

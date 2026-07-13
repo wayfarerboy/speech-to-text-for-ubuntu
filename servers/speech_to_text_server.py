@@ -22,12 +22,16 @@ Requirements:
   /home/amara/venv/bin/pip install -r /home/amara/speech-to-text-for-ubuntu/requirements.txt
 
 Automatic startup on boot:
-To automatically start this server on boot, you can use the following crontab entry
-for the user running the display (e.g. amara):
+Run `deploy/deploy-services.sh` to install and enable systemd units for both
+the STT server (user unit) and key listener (system unit). Both use
+`Restart=always` so they survive crashes and reboots.
 
-* * * * * ps -ef | grep "speech-to-text-for-ubuntu/servers/speech_to_text_server.py" | grep -v grep > /dev/null || /home/amara/venv/bin/python3 /home/amara/speech-to-text-for-ubuntu/servers/speech_to_text_server.py > /dev/null 2>&1 &
+  chmod +x deploy/deploy-services.sh
+  ./deploy/deploy-services.sh
 
-This cron job checks every minute if the script is running and if it is not, it starts the script.
+Check status:
+  systemctl --user status stt-server
+  systemctl status stt-keylistener
 """
 
 import json

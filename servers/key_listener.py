@@ -17,11 +17,9 @@ Any key on the keyboard or button on the mouse can be remapped to F16 or F17.
 This script must be run as root in order to access input devices (e.g., /dev/input/event*).
 Running as a regular user will result in permission errors.
 
-To automatically start this key listener on boot, you can use the following crontab entry for root:
-
-* * * * * ps -ef | grep "speech-to-text-for-ubuntu/servers/key_listener.py" | grep -v grep > /dev/null || /usr/bin/python3 /home/amara/speech-to-text-for-ubuntu/servers/key_listener.py > /dev/null 2>&1 &
-
-This cron job checks every minute if the script is running and if it is not, it starts the script.
+To automatically start this key listener on boot, run `deploy/deploy-services.sh`
+to install and enable a systemd system unit with `Restart=always`. The unit
+waits for the graphical session to be ready before starting.
 
 """
 

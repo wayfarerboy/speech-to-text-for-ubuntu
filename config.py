@@ -35,3 +35,13 @@ INITIAL_PROMPT_CS = (
 
 # ── Client ────────────────────────────────────────────────────────────
 COPY_TO_CLIPBOARD = "yes"
+
+# ── Deepgram streaming ────────────────────────────────────────────────
+DEEPGRAM_API_KEY = ""
+DEEPGRAM_MODEL = "nova-2"
+DEEPGRAM_ENDPOINT = "wss://api.deepgram.com/v1/listen"
+
+
+def streaming_enabled():
+    """Return True when Deepgram streaming is configured."""
+    return bool(DEEPGRAM_API_KEY.strip())

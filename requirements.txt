@@ -3,3 +3,4 @@ numpy
 soundfile
 faster-whisper
 sounddevice
+websockets

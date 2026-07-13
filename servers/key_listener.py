@@ -76,6 +76,7 @@ INDICATOR_SCRIPT = os.path.join(_PROJECT_DIR, "scripts", "recording_indicator.py
 from transcription_client import TranscriptionClient
 from text_typer import TextTyper
 from push_to_talk_session import PushToTalkSession
+from push_to_talk_session_streaming import PushToTalkSessionStreaming
 from indicator_adapter import ProcessIndicator
 
 def find_device_by_name(name, retries=10, delay=2):
@@ -174,13 +175,23 @@ def main():
     venv_python = os.path.join(env["HOME"], ".venv", "bin", "python3")
     indicator = ProcessIndicator(INDICATOR_SCRIPT, venv_python, env)
 
-    session = PushToTalkSession(
-        transcriber=TranscriptionClient(),
-        typer=TextTyper(),
-        indicator=indicator,
-        audio_file=AUDIO_FILE,
-        env=env,
-    )
+    if config.streaming_enabled():
+        logging.info("Deepgram streaming enabled — using PushToTalkSessionStreaming")
+        session = PushToTalkSessionStreaming(
+            transcriber=TranscriptionClient(),
+            typer=TextTyper(),
+            indicator=indicator,
+            audio_file=AUDIO_FILE,
+            env=env,
+        )
+    else:
+        session = PushToTalkSession(
+            transcriber=TranscriptionClient(),
+            typer=TextTyper(),
+            indicator=indicator,
+            audio_file=AUDIO_FILE,
+            env=env,
+        )
 
     logging.info("Listening for %s on %s", "/".join(key_map), device_path)
 

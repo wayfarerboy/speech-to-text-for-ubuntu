@@ -1,10 +1,13 @@
 """TranscriptionClient — send audio to the speech-to-text server over a Unix socket."""
 
 import json
+import logging
 import os
 import socket
 
 import config
+
+logger = logging.getLogger(__name__)
 
 
 class TranscriptionClient:
@@ -13,8 +16,9 @@ class TranscriptionClient:
     Interface: ``transcribe(audio_path, language) -> str``.
     """
 
-    def __init__(self, socket_path=None):
+    def __init__(self, socket_path=None, timeout=None):
         self.socket_path = socket_path or config.SOCKET_PATH
+        self.timeout = timeout if timeout is not None else config.TRANSCRIPTION_TIMEOUT
 
     def transcribe(self, audio_path, language="en"):
         """Send an audio file to the server and return the transcript text.
@@ -42,6 +46,9 @@ class TranscriptionClient:
             sock.sendall(json.dumps(req).encode("utf-8"))
             sock.shutdown(socket.SHUT_WR)
             resp = self._recv_json(sock)
+        except socket.timeout as e:
+            logger.warning("Transcription socket timed out: %s", e)
+            raise RuntimeError(f"Connection timed out: {e}") from e
         except (OSError, json.JSONDecodeError) as e:
             raise RuntimeError(f"Connection failed: {e}") from e
         finally:
@@ -58,6 +65,7 @@ class TranscriptionClient:
     def _connect(self):
         """Open a new Unix socket connection.  Overridable for tests."""
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.settimeout(self.timeout)
         sock.connect(self.socket_path)
         return sock
 

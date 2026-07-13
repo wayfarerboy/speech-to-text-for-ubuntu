@@ -1,6 +1,8 @@
 """Tests for TextTyper."""
 
+import logging
 import os
+import subprocess
 from unittest import mock
 
 import pytest
@@ -132,3 +134,69 @@ class TestReleaseModifiers:
         typer = TextTyper()
         with mock.patch("subprocess.run", side_effect=Exception("fail")):
             typer._release_modifiers()  # should not raise
+
+
+# ── timeout & fallback ─────────────────────────────────────────────────
+
+class TestTimeoutAndFallback:
+    def test_xdotool_timeout_falls_back_to_clipboard(self, caplog):
+        """When xdotool times out, clipboard fallback is used and warning logged."""
+        typer = TextTyper(clipboard_enabled=False)
+        timeout_expired = subprocess.TimeoutExpired(
+            cmd=["xdotool", "type", "--clearmodifiers", "hello "],
+            timeout=5,
+        )
+
+        with mock.patch.object(typer, "_release_modifiers"), \
+             mock.patch.object(typer, "_copy_to_clipboard") as mock_clip, \
+             mock.patch("subprocess.run", side_effect=timeout_expired):
+            with caplog.at_level(logging.WARNING):
+                typer.type("hello")
+
+        mock_clip.assert_called_once_with("hello")
+        assert any("timed out" in r.message.lower() for r in caplog.records)
+
+    def test_xdotool_nonzero_exit_falls_back_to_clipboard(self, caplog):
+        """When xdotool exits non-zero, clipboard fallback is used and warning logged."""
+        typer = TextTyper(clipboard_enabled=False)
+        called_process_error = subprocess.CalledProcessError(
+            returncode=1,
+            cmd=["xdotool", "type", "--clearmodifiers", "hello "],
+        )
+
+        with mock.patch.object(typer, "_release_modifiers"), \
+             mock.patch.object(typer, "_copy_to_clipboard") as mock_clip, \
+             mock.patch("subprocess.run", side_effect=called_process_error):
+            with caplog.at_level(logging.WARNING):
+                typer.type("hello")
+
+        mock_clip.assert_called_once_with("hello")
+        assert any("exited" in r.message.lower() for r in caplog.records)
+
+    def test_type_never_raises_on_failure(self, caplog):
+        """type() never propagates exceptions, even on catastrophic failure."""
+        typer = TextTyper()
+        with mock.patch.object(typer, "_release_modifiers"), \
+             mock.patch.object(typer, "_copy_to_clipboard",
+                               side_effect=Exception("clipboard also failed")), \
+             mock.patch("subprocess.run", side_effect=OSError("xdotool not found")):
+            with caplog.at_level(logging.WARNING):
+                typer.type("hello")  # must not raise
+
+        assert any("xdotool" in r.message.lower() or "clipboard" in r.message.lower()
+                   for r in caplog.records)
+
+    def test_fallback_bypasses_clipboard_enabled_flag(self):
+        """Even when clipboard_enabled=False, fallback still copies to clipboard."""
+        typer = TextTyper(clipboard_enabled=False)
+        timeout_expired = subprocess.TimeoutExpired(
+            cmd=["xdotool", "type", "--clearmodifiers", "test "],
+            timeout=5,
+        )
+
+        with mock.patch.object(typer, "_release_modifiers"), \
+             mock.patch.object(typer, "_copy_to_clipboard") as mock_clip, \
+             mock.patch("subprocess.run", side_effect=timeout_expired):
+            typer.type("test")
+
+        mock_clip.assert_called_once_with("test")

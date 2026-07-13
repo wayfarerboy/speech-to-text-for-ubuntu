@@ -1,12 +1,14 @@
 """Tests for TranscriptionClient."""
 
 import json
+import logging
 import os
 import socket
 from unittest import mock
 
 import pytest
 
+import config
 from transcription_client import TranscriptionClient
 
 
@@ -167,3 +169,39 @@ class TestTranscribe:
         finally:
             parent.close()
             child.close()
+
+
+# ── timeout ────────────────────────────────────────────────────────────
+
+class TestTimeout:
+    def test_uses_configured_timeout(self):
+        """TranscriptionClient uses TRANSCRIPTION_TIMEOUT from config by default."""
+        client = TranscriptionClient()
+        assert client.timeout == config.TRANSCRIPTION_TIMEOUT
+
+    def test_accepts_custom_timeout(self):
+        """TranscriptionClient accepts a custom timeout."""
+        client = TranscriptionClient(timeout=5)
+        assert client.timeout == 5
+
+    def test_socket_connect_timeout_logs_warning(self, caplog):
+        """Socket connect timeout logs a warning and propagates as RuntimeError."""
+        client = TranscriptionClient(socket_path="/tmp/stt_server.sock", timeout=1)
+        with mock.patch.object(os.path, "exists", return_value=True), \
+             mock.patch.object(client, "_connect",
+                               side_effect=socket.timeout("timed out")):
+            with caplog.at_level(logging.WARNING):
+                with pytest.raises(RuntimeError, match="Connection timed out"):
+                    client.transcribe("/tmp/test.wav")
+        assert any("timeout" in r.message.lower() or "timed out" in r.message.lower()
+                   for r in caplog.records)
+
+    def test_socket_sets_timeout_before_connect(self):
+        """_connect sets socket timeout before calling connect."""
+        client = TranscriptionClient(timeout=3)
+        mock_sock = mock.MagicMock()
+        mock_sock.connect.side_effect = OSError("no such file")
+        with mock.patch("socket.socket", return_value=mock_sock):
+            with pytest.raises(OSError):
+                client._connect()
+        mock_sock.settimeout.assert_called_once_with(3)

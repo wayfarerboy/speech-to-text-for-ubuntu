@@ -35,3 +35,7 @@ INITIAL_PROMPT_CS = (
 
 # ── Client ────────────────────────────────────────────────────────────
 COPY_TO_CLIPBOARD = "yes"
+
+# ── Timeouts ───────────────────────────────────────────────────────────
+TYPING_TIMEOUT = 5      # seconds before xdotool is killed + clipboard fallback
+TRANSCRIPTION_TIMEOUT = 10  # seconds for socket connect/recv

@@ -25,6 +25,9 @@ class TextTyper:
     def type(self, text):
         """Type *text* into the focused window, append a space,
         and optionally copy to clipboard.
+
+        On xdotool timeout or failure: logs a warning, falls back
+        to clipboard, and never raises.
         """
         text = text.strip()
         if not text:
@@ -32,15 +35,43 @@ class TextTyper:
 
         text_to_type = text + " "
         if self.clipboard_enabled:
-            self._copy_to_clipboard(text)
+            try:
+                self._copy_to_clipboard(text)
+            except Exception:
+                pass  # best-effort, never block typing
 
-        subprocess.run(
-            ["xdotool", "type", "--clearmodifiers", text_to_type],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        self._release_modifiers()
+        try:
+            subprocess.run(
+                ["xdotool", "type", "--clearmodifiers", text_to_type],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=config.TYPING_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired:
+            logger.warning(
+                "xdotool timed out after %ss — falling back to clipboard",
+                config.TYPING_TIMEOUT,
+            )
+            self._safe_clipboard_fallback(text)
+        except subprocess.CalledProcessError as e:
+            logger.warning(
+                "xdotool exited %s — falling back to clipboard",
+                e.returncode,
+            )
+            self._safe_clipboard_fallback(text)
+        except Exception as e:
+            logger.warning("xdotool failed: %s — falling back to clipboard", e)
+            self._safe_clipboard_fallback(text)
+        finally:
+            self._release_modifiers()
+
+    def _safe_clipboard_fallback(self, text):
+        """Try clipboard fallback; log if it also fails. Never raises."""
+        try:
+            self._copy_to_clipboard(text)
+        except Exception as e:
+            logger.warning("Clipboard fallback also failed: %s", e)
 
     # ── internal ──────────────────────────────────────────────────
 

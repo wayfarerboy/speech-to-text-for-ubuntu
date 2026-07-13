@@ -1,4 +1,4 @@
-"""Tests for PushToTalkSession."""
+"""Tests for PushToTalkSession (recording-only variant)."""
 
 import subprocess
 from unittest import mock
@@ -6,7 +6,7 @@ from unittest import mock
 import pytest
 
 from push_to_talk_session import PushToTalkSession
-from tests.fake_adapters import FakeIndicator, FakeTranscriber, FakeTyper
+from tests.fake_adapters import FakeIndicator
 
 
 # ── helpers ────────────────────────────────────────────────────────────
@@ -28,8 +28,6 @@ class TestSessionLifecycle:
 
         indicator = FakeIndicator()
         session = PushToTalkSession(
-            transcriber=FakeTranscriber(),
-            typer=FakeTyper(),
             indicator=indicator,
             audio_file="/tmp/test.wav",
             env={"HOME": "/tmp"},
@@ -39,7 +37,7 @@ class TestSessionLifecycle:
         result = session.start("en")
         assert result is True
         assert session.state == "recording"
-        assert session._current_language == "en"
+        assert session.current_language == "en"
 
         # arecord spawned with correct args
         mock_popen.assert_called_once()
@@ -57,8 +55,6 @@ class TestSessionLifecycle:
 
         indicator = FakeIndicator()
         session = PushToTalkSession(
-            transcriber=FakeTranscriber(),
-            typer=FakeTyper(),
             indicator=indicator,
             audio_file="/tmp/test.wav",
             env={},
@@ -70,60 +66,35 @@ class TestSessionLifecycle:
         result = session.start("cs")
         assert result is False
         assert session.state == "recording"
-        assert session._current_language == "en"  # unchanged
+        assert session.current_language == "en"  # unchanged
         assert mock_popen.call_count == 1  # only one arecord spawned
 
-    def test_start_from_transcribing_blocked(self, monkeypatch):
-        """Calling start() while transcribing is a no-op."""
+    def test_stop_terminates_arecord_and_shows_processing(self, monkeypatch):
+        """stop() terminates recording, shows processing, returns language."""
         mock_popen = mock.MagicMock(return_value=_fake_popen())
         monkeypatch.setattr(subprocess, "Popen", mock_popen)
 
-        session = PushToTalkSession(
-            transcriber=FakeTranscriber(),
-            typer=FakeTyper(),
-            indicator=FakeIndicator(),
-            audio_file="/tmp/test.wav",
-            env={},
-        )
-        # Force into transcribing state
-        session._state = "transcribing"
-        result = session.start("en")
-        assert result is False
-
-    def test_stop_transcribes_and_types(self, monkeypatch):
-        """stop() terminates recording, transcribes, types, hides indicator."""
-        mock_popen = mock.MagicMock(return_value=_fake_popen())
-        monkeypatch.setattr(subprocess, "Popen", mock_popen)
-
-        transcriber = FakeTranscriber("hello world")
-        typer = FakeTyper()
         indicator = FakeIndicator()
         session = PushToTalkSession(
-            transcriber=transcriber,
-            typer=typer,
             indicator=indicator,
             audio_file="/tmp/test.wav",
             env={},
         )
 
         session.start("en")
-        text = session.stop()
+        language = session.stop()
 
-        assert text == "hello world"
+        assert language == "en"
         assert session.state == "idle"
-        assert transcriber.calls == [("/tmp/test.wav", "en")]
-        assert typer.texts == ["hello world"]
+        assert session.current_language is None
         assert indicator.calls == [
             ("show", "recording"),
             ("show", "processing"),
-            ("hide",),
         ]
 
     def test_stop_before_start_safe(self):
         """Calling stop() from idle is a no-op."""
         session = PushToTalkSession(
-            transcriber=FakeTranscriber(),
-            typer=FakeTyper(),
             indicator=FakeIndicator(),
             audio_file="/tmp/test.wav",
             env={},
@@ -139,8 +110,6 @@ class TestSessionLifecycle:
         monkeypatch.setattr(subprocess, "Popen", mock_popen)
 
         session = PushToTalkSession(
-            transcriber=FakeTranscriber(),
-            typer=FakeTyper(),
             indicator=FakeIndicator(),
             audio_file="/tmp/test.wav",
             env={},
@@ -152,44 +121,18 @@ class TestSessionLifecycle:
         fake_proc.terminate.assert_called_once()
         fake_proc.wait.assert_called_once()
 
-    def test_transcribe_error_cleans_up(self, monkeypatch):
-        """If transcribe raises, indicator is hidden and state resets to idle."""
-        mock_popen = mock.MagicMock(return_value=_fake_popen())
-        monkeypatch.setattr(subprocess, "Popen", mock_popen)
-
-        failing = FakeTranscriber()
-        failing.transcribe = mock.MagicMock(side_effect=RuntimeError("fail"))
-        indicator = FakeIndicator()
-
+    def test_stop_returns_none_when_not_recording(self):
+        """Calling stop() while idle returns None."""
         session = PushToTalkSession(
-            transcriber=failing,
-            typer=FakeTyper(),
-            indicator=indicator,
-            audio_file="/tmp/test.wav",
-            env={},
-        )
-
-        session.start("en")
-        with pytest.raises(RuntimeError, match="fail"):
-            session.stop()
-
-        assert session.state == "idle"
-        # indicator was shown (processing) then hidden
-        assert ("show", "processing") in indicator.calls
-        assert ("hide",) in indicator.calls
-
-    def test_stop_from_transcribing_blocked(self):
-        """Calling stop() while already transcribing is a no-op."""
-        session = PushToTalkSession(
-            transcriber=FakeTranscriber(),
-            typer=FakeTyper(),
             indicator=FakeIndicator(),
             audio_file="/tmp/test.wav",
             env={},
         )
-        session._state = "transcribing"
-        result = session.stop()
-        assert result is None
+        session._state = "recording"
+        session._current_language = None
+        # Simulate stop called after arecord already terminated externally
+        language = session.stop()
+        assert language is None  # returns None (current_language was None)
 
 
 # ── language routing ───────────────────────────────────────────────────
@@ -201,32 +144,56 @@ class TestLanguageRouting:
         monkeypatch.setattr(subprocess, "Popen", mock_popen)
 
         session = PushToTalkSession(
-            transcriber=FakeTranscriber(),
-            typer=FakeTyper(),
             indicator=FakeIndicator(),
             audio_file="/tmp/test.wav",
             env={},
         )
 
         session.start("cs")
-        assert session._current_language == "cs"
+        assert session.current_language == "cs"
+
+    def test_stop_returns_language(self, monkeypatch):
+        """stop() returns the language that was being recorded."""
+        mock_popen = mock.MagicMock(return_value=_fake_popen())
+        monkeypatch.setattr(subprocess, "Popen", mock_popen)
+
+        session = PushToTalkSession(
+            indicator=FakeIndicator(),
+            audio_file="/tmp/test.wav",
+            env={},
+        )
+
+        session.start("cs")
+        language = session.stop()
+        assert language == "cs"
+
+    def test_current_language_cleared_after_stop(self, monkeypatch):
+        """After stop(), current_language is None."""
+        mock_popen = mock.MagicMock(return_value=_fake_popen())
+        monkeypatch.setattr(subprocess, "Popen", mock_popen)
+
+        session = PushToTalkSession(
+            indicator=FakeIndicator(),
+            audio_file="/tmp/test.wav",
+            env={},
+        )
+
+        session.start("en")
+        session.stop()
+        assert session.current_language is None
 
 
 # ── integration ────────────────────────────────────────────────────────
 
 class TestIntegration:
     def test_full_lifecycle(self, monkeypatch):
-        """start → stop → idle: full happy path."""
+        """start → stop → idle: full recording path."""
         mock_popen = mock.MagicMock(return_value=_fake_popen())
         monkeypatch.setattr(subprocess, "Popen", mock_popen)
 
-        transcriber = FakeTranscriber("hello world")
-        typer = FakeTyper()
         indicator = FakeIndicator()
 
         session = PushToTalkSession(
-            transcriber=transcriber,
-            typer=typer,
             indicator=indicator,
             audio_file="/tmp/test.wav",
             env={},
@@ -238,7 +205,47 @@ class TestIntegration:
         assert started is True
         assert session.state == "recording"
 
-        text = session.stop()
-        assert text == "hello world"
+        language = session.stop()
+        assert language == "en"
         assert session.state == "idle"
-        assert typer.texts == ["hello world"]
+        assert indicator.calls == [
+            ("show", "recording"),
+            ("show", "processing"),
+        ]
+
+    def test_rapid_successive_key_presses(self, monkeypatch):
+        """Multiple start/stop cycles work correctly."""
+        mock_popen = mock.MagicMock(return_value=_fake_popen())
+        monkeypatch.setattr(subprocess, "Popen", mock_popen)
+
+        indicator = FakeIndicator()
+        session = PushToTalkSession(
+            indicator=indicator,
+            audio_file="/tmp/test.wav",
+            env={},
+        )
+
+        for lang in ["en", "cs", "en"]:
+            started = session.start(lang)
+            assert started is True
+            assert session.state == "recording"
+            assert session.current_language == lang
+
+            language = session.stop()
+            assert language == lang
+            assert session.state == "idle"
+            assert session.current_language is None
+
+        # Three recordings = 3 arecord spawns + 3 terminate/wait
+        assert mock_popen.call_count == 3
+
+    def test_no_transcriber_or_typer_injected(self, monkeypatch):
+        """Session no longer accepts transcriber or typer."""
+        # This tests that the constructor signature is correct
+        session = PushToTalkSession(
+            indicator=FakeIndicator(),
+            audio_file="/tmp/test.wav",
+            env={},
+        )
+        assert not hasattr(session, "_transcriber")
+        assert not hasattr(session, "_typer")

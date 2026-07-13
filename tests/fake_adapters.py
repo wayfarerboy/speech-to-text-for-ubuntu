@@ -4,8 +4,13 @@
 class FakeIndicator:
     """Records show/hide calls for test assertions."""
 
-    def __init__(self):
+    def __init__(self, pid=12345):
         self.calls = []
+        self._pid = pid
+
+    @property
+    def pid(self):
+        return self._pid
 
     def show(self, mode):
         self.calls.append(("show", mode))

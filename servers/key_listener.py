@@ -25,6 +25,7 @@ waits for the graphical session to be ready before starting.
 
 import logging
 import os
+import signal
 import sys
 import subprocess
 import pwd
@@ -72,9 +73,7 @@ _PROJECT_DIR = os.path.dirname(_SCRIPT_DIR)  # up from servers/
 
 INDICATOR_SCRIPT = os.path.join(_PROJECT_DIR, "scripts", "recording_indicator.py")
 
-# Transcription modules (imported directly instead of via subprocess).
-from transcription_client import TranscriptionClient
-from text_typer import TextTyper
+# Recording session (slimmed to recording-only; transcription/typing offloaded to coordinator).
 from push_to_talk_session import PushToTalkSession
 from push_to_talk_session_streaming import PushToTalkSessionStreaming
 from indicator_adapter import ProcessIndicator
@@ -102,6 +101,24 @@ def find_device_by_name(name, retries=10, delay=2):
             )
             time.sleep(delay)
     raise FileNotFoundError(f"Device '{name}' not found after {retries} attempts")
+
+def _demote(uid, gid):
+    """Return a preexec_fn that drops privileges to *uid*/*gid*."""
+    def _drop():
+        os.setgid(gid)
+        os.setuid(uid)
+    return _drop
+
+
+def _hide_indicator_safe(pid):
+    """Send SIGTERM to indicator PID — best-effort, never raises."""
+    if pid is None:
+        return
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except Exception:
+        pass
+
 
 def setup_environment():
     pw_record = pwd.getpwnam(USER)
@@ -174,9 +191,17 @@ def main():
     # Wire adapters.
     venv_python = os.path.join(env["HOME"], ".venv", "bin", "python3")
     indicator = ProcessIndicator(INDICATOR_SCRIPT, venv_python, env)
+    coordinator_script = os.path.join(_PROJECT_DIR, "scripts", "stt_coordinator.py")
+
+    # Record the user's uid/gid for privilege-dropping the coordinator.
+    pw_record = pwd.getpwnam(USER)
+    user_uid = pw_record.pw_uid
+    user_gid = pw_record.pw_gid
 
     if config.streaming_enabled():
         logging.info("Deepgram streaming enabled — using PushToTalkSessionStreaming")
+        from transcription_client import TranscriptionClient
+        from text_typer import TextTyper
         session = PushToTalkSessionStreaming(
             transcriber=TranscriptionClient(),
             typer=TextTyper(),
@@ -186,14 +211,30 @@ def main():
         )
     else:
         session = PushToTalkSession(
-            transcriber=TranscriptionClient(),
-            typer=TextTyper(),
             indicator=indicator,
             audio_file=AUDIO_FILE,
             env=env,
         )
 
     logging.info("Listening for %s on %s", "/".join(key_map), device_path)
+
+    def _spawn_coordinator(language, indicator_pid):
+        """Spawn the coordinator as the desktop user (non-blocking)."""
+        try:
+            subprocess.Popen(
+                [
+                    sys.executable,
+                    coordinator_script,
+                    AUDIO_FILE,
+                    "--language", language,
+                    "--indicator-pid", str(indicator_pid),
+                ],
+                env=env,
+                preexec_fn=_demote(user_uid, user_gid),
+            )
+        except Exception as e:
+            logging.error("Failed to spawn coordinator: %s", e)
+            _hide_indicator_safe(indicator_pid)
 
     try:
         for event in device.read_loop():
@@ -218,13 +259,17 @@ def main():
                         logging.info("Stopping audio recording")
                         started_at = time.monotonic()
                         try:
-                            session.stop()
+                            language = session.stop()
+                            if language is not None:
+                                indicator_pid = indicator.pid
+                                _spawn_coordinator(language, indicator_pid)
                             elapsed = time.monotonic() - started_at
                             logging.info(
-                                "Speech-to-text completed in %.2f seconds", elapsed
+                                "Recording stopped in %.2f seconds (coordinator spawned)",
+                                elapsed,
                             )
                         except Exception as e:
-                            logging.error("Speech-to-text failed: %s", e)
+                            logging.error("Stop recording failed: %s", e)
 
     except KeyboardInterrupt:
         logging.info("Shutting down due to keyboard interrupt")

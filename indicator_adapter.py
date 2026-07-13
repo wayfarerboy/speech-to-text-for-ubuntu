@@ -37,6 +37,13 @@ class ProcessIndicator(IndicatorAdapter):
         self._env = env
         self._process = None
 
+    @property
+    def pid(self):
+        """PID of the indicator process, or None if not running."""
+        if self._process and self._process.poll() is None:
+            return self._process.pid
+        return None
+
     def show(self, mode):
         if mode == "recording":
             if self._process is not None:

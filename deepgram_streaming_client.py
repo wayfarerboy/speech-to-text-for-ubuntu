@@ -28,7 +28,7 @@ class DeepgramStreamingClient:
     """
 
     def __init__(self, api_key=None, model=None, endpoint=None):
-        self.api_key = api_key or config.DEEPGRAM_API_KEY
+        self.api_key = api_key if api_key is not None else config.DEEPGRAM_API_KEY
         self.model = model or config.DEEPGRAM_MODEL
         self.endpoint = endpoint or config.DEEPGRAM_ENDPOINT
         self._buffer = []
@@ -45,6 +45,7 @@ class DeepgramStreamingClient:
         params = (
             f"encoding=linear16&sample_rate=16000&channels=1"
             f"&model={self.model}"
+            f"{config.deepgram_extra_params()}"
         )
         url = f"{self.endpoint}?{params}"
 
@@ -54,6 +55,8 @@ class DeepgramStreamingClient:
                 additional_headers={
                     "Authorization": f"Token {self.api_key}",
                 },
+                open_timeout=10,
+                close_timeout=5,
             )
         except Exception as exc:
             raise ConnectionError(

@@ -51,7 +51,6 @@ echo "==> stt-server.service enabled and started"
 # ── system service: key listener ──────────────────────────────────────
 
 SYSTEMD_SYSTEM_DIR="/etc/systemd/system"
-SYSTEM_PYTHON="/usr/bin/python3"
 
 pkexec tee "$SYSTEMD_SYSTEM_DIR/stt-keylistener.service" > /dev/null <<EOF
 [Unit]
@@ -60,7 +59,7 @@ Wants=graphical.target
 After=graphical.target
 
 [Service]
-ExecStart=$SYSTEM_PYTHON $PROJECT_DIR/servers/key_listener.py
+ExecStart=$VENV_PYTHON $PROJECT_DIR/servers/key_listener.py
 Restart=always
 RestartSec=5
 

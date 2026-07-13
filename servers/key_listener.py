@@ -204,7 +204,7 @@ def main():
         from text_typer import TextTyper
         session = PushToTalkSessionStreaming(
             transcriber=TranscriptionClient(),
-            typer=TextTyper(),
+            typer=TextTyper(env=env),
             indicator=indicator,
             audio_file=AUDIO_FILE,
             env=env,
@@ -259,10 +259,14 @@ def main():
                         logging.info("Stopping audio recording")
                         started_at = time.monotonic()
                         try:
-                            language = session.stop()
-                            if language is not None:
-                                indicator_pid = indicator.pid
-                                _spawn_coordinator(language, indicator_pid)
+                            if isinstance(session, PushToTalkSessionStreaming):
+                                # Streaming session handles typing + indicator internally.
+                                session.stop()
+                            else:
+                                language = session.stop()
+                                if language is not None:
+                                    indicator_pid = indicator.pid
+                                    _spawn_coordinator(language, indicator_pid)
                             elapsed = time.monotonic() - started_at
                             logging.info(
                                 "Recording stopped in %.2f seconds (coordinator spawned)",

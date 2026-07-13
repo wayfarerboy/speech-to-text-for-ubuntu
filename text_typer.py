@@ -15,12 +15,13 @@ class TextTyper:
     Interface: ``type(text)``.
     """
 
-    def __init__(self, clipboard_enabled=None):
+    def __init__(self, clipboard_enabled=None, env=None):
         self.clipboard_enabled = (
             clipboard_enabled
             if clipboard_enabled is not None
             else bool(str(config.COPY_TO_CLIPBOARD).strip())
         )
+        self._env = env or os.environ
 
     def type(self, text):
         """Type *text* into the focused window, append a space,
@@ -47,6 +48,7 @@ class TextTyper:
                 capture_output=True,
                 text=True,
                 timeout=config.TYPING_TIMEOUT,
+                env=self._env,
             )
         except subprocess.TimeoutExpired:
             logger.warning(
@@ -75,11 +77,11 @@ class TextTyper:
 
     # ── internal ──────────────────────────────────────────────────
 
-    @staticmethod
-    def _copy_to_clipboard(text):
-        if os.environ.get("WAYLAND_DISPLAY"):
+    def _copy_to_clipboard(self, text):
+        env = self._env
+        if env.get("WAYLAND_DISPLAY"):
             cmd = ["wl-copy"]
-        elif os.environ.get("DISPLAY"):
+        elif env.get("DISPLAY"):
             cmd = ["xclip", "-selection", "clipboard"]
         else:
             logger.warning("No clipboard tool available.")
@@ -92,6 +94,7 @@ class TextTyper:
                 text=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
+                env=self._env,
             )
             return True
         except FileNotFoundError:

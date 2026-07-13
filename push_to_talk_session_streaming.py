@@ -59,13 +59,20 @@ class PushToTalkSessionStreaming:
         if self._state != "idle":
             return False
 
-        self._current_language = language
-        self._state = "recording"
-        self._indicator.show("recording")
-
+        # Clean up any stale FIFO/PCM from a previous crashed session.
         pid = os.getpid()
         self._fifo_path = f"/tmp/stt_stream_{pid}.fifo"
         self._pcm_backup_path = f"/tmp/stt_stream_{pid}.pcm"
+        for stale in (self._fifo_path, self._pcm_backup_path):
+            if os.path.exists(stale):
+                try:
+                    os.unlink(stale)
+                except OSError:
+                    pass
+
+        self._current_language = language
+        self._state = "recording"
+        self._indicator.show("recording")
 
         # Create FIFO
         try:
@@ -108,16 +115,25 @@ class PushToTalkSessionStreaming:
         if self._state != "recording":
             return None
 
-        # Stop arecord
-        self._recording_process.terminate()
-        self._recording_process.wait()
-        self._recording_process = None
+        logger.info("stop() entered, state=%s", self._state)
 
         self._state = "transcribing"
         self._indicator.show("processing")
 
-        # Signal the worker to drain / stop
+        # Signal worker to stop reading — must happen BEFORE terminating
+        # arecord, otherwise arecord may block in FIFO open() forever.
         self._stop_event.set()
+
+        # Stop arecord with timeout; SIGKILL if it hangs.
+        self._recording_process.terminate()
+        try:
+            self._recording_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            logger.warning("arecord did not exit after SIGTERM — sending SIGKILL")
+            self._recording_process.kill()
+            self._recording_process.wait(timeout=3)
+        self._recording_process = None
+
         if self._worker_thread and self._worker_thread.is_alive():
             self._worker_thread.join(timeout=15)
 
@@ -144,7 +160,13 @@ class PushToTalkSessionStreaming:
 
     def _stream_worker(self):
         """Connect Deepgram, read FIFO → feed audio, drain on stop."""
-        dg = self._dg_factory()
+        try:
+            dg = self._dg_factory()
+        except Exception as exc:
+            logger.warning("Deepgram client creation failed: %s — falling back", exc)
+            self._fallback_needed = True
+            self._capture_pcm_only()
+            return
 
         # 1. Connect
         try:
@@ -166,8 +188,8 @@ class PushToTalkSessionStreaming:
         if not self._fallback_needed:
             try:
                 self._transcript = _run_async(dg.stop_and_get_text())
-            except Exception:
-                logger.warning("Deepgram drain failed — falling back")
+            except Exception as exc:
+                logger.warning("Deepgram drain failed: %s — falling back", exc)
                 self._fallback_needed = True
 
     def _feed_fifo_to_deepgram(self, dg):
@@ -249,13 +271,23 @@ class PushToTalkSessionStreaming:
 
 # ── helpers ──────────────────────────────────────────────────────────
 
+_EVENT_LOOP = None
+
+
+def _get_loop():
+    """Return a persistent event loop (lazy-init, thread-safe)."""
+    global _EVENT_LOOP
+    if _EVENT_LOOP is None:
+        _EVENT_LOOP = asyncio.new_event_loop()
+        threading.Thread(target=_EVENT_LOOP.run_forever, daemon=True).start()
+    return _EVENT_LOOP
+
+
 def _run_async(coro):
-    """Run async coroutine synchronously in a fresh event loop."""
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+    """Run async coroutine synchronously on the shared event loop."""
+    loop = _get_loop()
+    future = asyncio.run_coroutine_threadsafe(coro, loop)
+    return future.result()
 
 
 def _build_default_dg_client():

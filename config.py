@@ -49,3 +49,29 @@ DEEPGRAM_ENDPOINT = "wss://api.deepgram.com/v1/listen"
 def streaming_enabled():
     """Return True when Deepgram streaming is configured."""
     return bool(DEEPGRAM_API_KEY.strip())
+
+# ── Deepgram formatting ───────────────────────────────────────────────
+SMART_FORMAT = "true"   # capitals, punctuation, dates, numbers
+PUNCTUATE = "true"       # periods, commas, question/exclamation marks
+UTTERANCE_END_MS = 1000  # ms of silence before finalizing utterance
+NUMERALS = "false"       # "42" instead of "forty two"
+DIARIZE = "false"        # speaker labels
+
+
+def deepgram_extra_params():
+    """Build extra query params for Deepgram streaming."""
+    params = []
+    if str(SMART_FORMAT).strip() == "true":
+        params.append("smart_format=true")
+    if str(PUNCTUATE).strip() == "true":
+        params.append("punctuate=true")
+    if str(NUMERALS).strip() == "true":
+        params.append("numerals=true")
+    if str(DIARIZE).strip() == "true":
+        params.append("diarize=true")
+    ms = UTTERANCE_END_MS
+    if isinstance(ms, int) and ms > 0:
+        params.append(f"utterance_end_ms={ms}")
+    if params:
+        return "&" + "&".join(params)
+    return ""

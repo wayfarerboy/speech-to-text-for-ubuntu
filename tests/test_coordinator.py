@@ -153,6 +153,44 @@ class TestMain:
             assert exit_code == 0
             mock_transcribe.assert_called_once_with("/tmp/test.wav", "en")
 
+    def test_exits_nonzero_when_typing_fails(self):
+        """When typing raises, exit non-zero. Still hides indicator."""
+        with mock.patch.object(
+            stt_coordinator.TranscriptionClient, "transcribe",
+            return_value="hello world",
+        ), mock.patch.object(
+            stt_coordinator.TextTyper, "type",
+            side_effect=RuntimeError("xdotool crashed"),
+        ) as mock_type, \
+           mock.patch("os.kill") as mock_kill:
+
+            exit_code = stt_coordinator.main(
+                audio_file="/tmp/test.wav",
+                language="en",
+                indicator_pid=42,
+            )
+
+            assert exit_code != 0
+            mock_type.assert_called_once_with("hello world")
+            mock_kill.assert_called_once_with(42, signal.SIGTERM)
+
+    def test_exits_nonzero_on_generic_exception(self):
+        """When an unexpected exception occurs, exit non-zero. Still hides indicator."""
+        with mock.patch.object(
+            stt_coordinator.TranscriptionClient, "transcribe",
+            side_effect=ConnectionError("network error"),
+        ) as mock_transcribe, \
+           mock.patch("os.kill") as mock_kill:
+
+            exit_code = stt_coordinator.main(
+                audio_file="/tmp/test.wav",
+                language="en",
+                indicator_pid=42,
+            )
+
+            assert exit_code != 0
+            mock_kill.assert_called_once_with(42, signal.SIGTERM)
+
 
 # ── Run entry-point ───────────────────────────────────────────────────
 

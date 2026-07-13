@@ -9,7 +9,7 @@ and returns JSON with segment strings and joined text.
 
 You may configure a primary model for most languages and an optional secondary model
 for specific language codes (see SECONDARY_LANGUAGE_MODEL and SECONDARY_MODEL_LANGUAGES).
-Clients such as speech_to_text_client.py connect to this socket; the server must be
+Clients such as stt_coordinator.py connect to this socket; the server must be
 able to read any audio path the client sends.
 
 Requirements: 

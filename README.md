@@ -10,7 +10,7 @@ This project gives Ubuntu a practical push-to-talk speech-to-text workflow. You 
 
 The main goal is low-latency local transcription that is still usable on ordinary hardware. In practice, this setup can be fast enough for live work even on a laptop without a dedicated GPU. On CPU-only hardware, transcription can still complete in under two seconds, which makes it practical for live communication with an AI agent or any other text interface without typing.
 
-The project is built from four parts. `servers/key_listener.py` listens for a hotkey, starts recording on key press, and stops on key release. `servers/speech_to_text_server.py` runs a local Unix socket server and performs speech-to-text with faster-whisper. `scripts/speech_to_text_client.py` sends the recorded audio to the server, receives the transcript, optionally copies it to the clipboard, and types the text with `xdotool`. `scripts/recording_indicator.py` shows a live audio spectrogram while recording and a processing animation during transcription.
+The project is built from four parts. `servers/key_listener.py` listens for a hotkey, starts recording on key press, spawns a coordinator on key release, and returns to listening immediately. `servers/speech_to_text_server.py` runs a local Unix socket server and performs speech-to-text with faster-whisper. `scripts/stt_coordinator.py` sends the recorded audio to the server, receives the transcript, optionally copies it to the clipboard, and types the text with `xdotool`. `scripts/recording_indicator.py` shows a live audio spectrogram while recording and a processing animation during transcription.
 
 Tested on Kubuntu 24.04 LTS, Kali 2026.1, Ubuntu 24.04 LTS
 
@@ -20,10 +20,10 @@ Tested on Kubuntu 24.04 LTS, Kali 2026.1, Ubuntu 24.04 LTS
 2. `key_listener.py` starts recording audio with `arecord` and launches a live spectrogram overlay
 3. You release the key
 4. The spectrogram switches to a processing animation while transcription runs
-5. The key listener calls `speech_to_text_client.py`
-6. The client sends the audio file path and language to `speech_to_text_server.py`
+5. The key listener spawns `stt_coordinator.py` (as the desktop user)
+6. The coordinator sends the audio file path and language to `speech_to_text_server.py`
 7. The server loads the audio and runs faster-whisper
-8. The client receives the transcript, kills the indicator overlay
+8. The coordinator receives the transcript, kills the indicator overlay
 9. The transcript is optionally copied to the clipboard and typed into the active window
 10. Modifier keys are automatically released after typing to prevent stuck keys
 
@@ -133,7 +133,7 @@ By default, the primary model is used for most languages, and the secondary mode
 
 ## Optional clipboard behavior
 
-If you want the transcript to be copied to the clipboard before typing, leave `COPY_TO_CLIPBOARD` enabled in `scripts/speech_to_text_client.py`:
+If you want the transcript to be copied to the clipboard before typing, leave `COPY_TO_CLIPBOARD` enabled in `config.py`:
 
 ```python
 COPY_TO_CLIPBOARD = "yes"
@@ -212,7 +212,7 @@ sudo journalctl -u stt-keylistener -f
 
 ## Logs
 
-The scripts write logs to `/tmp/stt_server.log`, `/tmp/stt_client.log`, and `/tmp/stt_key_listener.log`. These are useful when checking whether the workflow is running correctly or when tuning performance.
+The scripts write logs to `/tmp/stt_server.log`, `/tmp/stt_coordinator.log`, and `/tmp/stt_key_listener.log`. These are useful when checking whether the workflow is running correctly or when tuning performance.
 
 ## Troubleshooting
 
@@ -247,7 +247,7 @@ Ensure `sounddevice` is installed in the project's virtual environment:
 
 ## Testing
 
-A pytest suite covers the server, client, and key listener modules (40 tests).
+A pytest suite covers the server, coordinator, key listener, and supporting modules (150 tests).
 
 ```bash
 pip install pytest
@@ -259,7 +259,7 @@ python3 -m pytest tests/ -v
 | Module | Coverage |
 |---|---|
 | `speech_to_text_server.py` | Audio loading (mono/stereo/missing), model selection, request handling, socket JSON I/O |
-| `speech_to_text_client.py` | Socket communication, X11/Wayland clipboard, xdotool typing, modifier key release, `--indicator-pid` flag |
+| `stt_coordinator.py` | Socket communication, X11/Wayland clipboard, xdotool typing, modifier key release, `--indicator-pid` flag |
 | `key_listener.py` | Device discovery by name, environment setup (display, PulseAudio, XDG), script path derivation, subprocess calls |
 
 ### What's mocked

@@ -7,7 +7,6 @@ final transcript segments.  Returns concatenated text when stopped.
 import asyncio
 import json
 import logging
-import time
 
 import websockets
 import websockets.exceptions
@@ -43,7 +42,6 @@ class DeepgramStreamingClient:
         if not self.api_key:
             raise ValueError("DEEPGRAM_API_KEY is not set")
 
-        t0 = time.perf_counter()
         params = (
             f"encoding=linear16&sample_rate=16000&channels=1"
             f"&model={self.model}"
@@ -66,7 +64,6 @@ class DeepgramStreamingClient:
             ) from exc
 
         self._receiver_task = asyncio.create_task(self._receive_loop())
-        logger.info("[DEBUG-dg] connect: %.0f ms", (time.perf_counter() - t0) * 1000)
 
     async def feed_audio_async(self, audio_chunk: bytes):
         """Send a chunk of raw PCM audio over the WebSocket."""
@@ -79,7 +76,6 @@ class DeepgramStreamingClient:
         if not self._ws:
             raise RuntimeError("Not connected.  Call connect() first.")
 
-        t0 = time.perf_counter()
         await self._ws.send(json.dumps({"type": "CloseStream"}))
 
         if self._receiver_task:
@@ -87,14 +83,11 @@ class DeepgramStreamingClient:
                 await self._receiver_task
             except Exception:
                 pass
-        logger.info("[DEBUG-dg] drain (after CloseStream): %.0f ms", (time.perf_counter() - t0) * 1000)
 
         await self._ws.close()
         self._ws = None
 
-        result = " ".join(self._buffer)
-        logger.info("[DEBUG-dg] stop_and_get_text total: %.0f ms, text len=%d", (time.perf_counter() - t0) * 1000, len(result))
-        return result
+        return " ".join(self._buffer)
 
     # ── internal ──────────────────────────────────────────────────
 

@@ -8,7 +8,6 @@ import logging
 import os
 import subprocess
 import threading
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +115,6 @@ class PushToTalkSessionStreaming:
         if self._state != "recording":
             return None
 
-        t0 = time.perf_counter()
         logger.info("stop() entered, state=%s", self._state)
 
         self._state = "transcribing"
@@ -127,7 +125,6 @@ class PushToTalkSessionStreaming:
         self._stop_event.set()
 
         # Stop arecord with timeout; SIGKILL if it hangs.
-        t1 = time.perf_counter()
         self._recording_process.terminate()
         try:
             self._recording_process.wait(timeout=5)
@@ -136,17 +133,12 @@ class PushToTalkSessionStreaming:
             self._recording_process.kill()
             self._recording_process.wait(timeout=3)
         self._recording_process = None
-        logger.info("[DEBUG-stop] arecord terminate: %.0f ms", (time.perf_counter() - t1) * 1000)
 
-        # Join worker thread (DeepGram drain happens here).
-        t2 = time.perf_counter()
         if self._worker_thread and self._worker_thread.is_alive():
             self._worker_thread.join(timeout=15)
-        logger.info("[DEBUG-stop] worker join: %.0f ms", (time.perf_counter() - t2) * 1000)
 
         self._indicator.hide()
 
-        t3 = time.perf_counter()
         text = ""
         try:
             if self._fallback_needed:
@@ -162,12 +154,6 @@ class PushToTalkSessionStreaming:
 
         self._state = "idle"
         self._current_language = None
-        logger.info(
-            "[DEBUG-stop] text+type+cleanup: %.0f ms | total stop(): %.0f ms | fallback=%s",
-            (time.perf_counter() - t3) * 1000,
-            (time.perf_counter() - t0) * 1000,
-            self._fallback_needed,
-        )
         return text
 
     # ── worker (runs in background thread) ────────────────────────

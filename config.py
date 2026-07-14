@@ -41,7 +41,7 @@ TYPING_TIMEOUT = 5      # seconds before xdotool is killed + clipboard fallback
 TRANSCRIPTION_TIMEOUT = 10  # seconds for socket connect/recv
 
 # ── Deepgram streaming ────────────────────────────────────────────────
-DEEPGRAM_API_KEY = ""
+DEEPGRAM_API_KEY = "f496b23fa7b216583bfcfc3f3194e6b67ee4617a"
 DEEPGRAM_MODEL = "nova-2"
 DEEPGRAM_ENDPOINT = "wss://api.deepgram.com/v1/listen"
 
@@ -53,7 +53,7 @@ def streaming_enabled():
 # ── Deepgram formatting ───────────────────────────────────────────────
 SMART_FORMAT = "true"   # capitals, punctuation, dates, numbers
 PUNCTUATE = "true"       # periods, commas, question/exclamation marks
-UTTERANCE_END_MS = 1000  # ms of silence before finalizing utterance
+UTTERANCE_END_MS = 0  # ms of silence before finalizing utterance (disabled — 400 with nova-2)
 NUMERALS = "false"       # "42" instead of "forty two"
 DIARIZE = "false"        # speaker labels
 

@@ -43,7 +43,7 @@ class TextTyper:
 
         try:
             subprocess.run(
-                ["xdotool", "type", "--clearmodifiers", text_to_type],
+                ["xdotool", "type", "--delay", "0", "--clearmodifiers", text_to_type],
                 check=True,
                 capture_output=True,
                 text=True,

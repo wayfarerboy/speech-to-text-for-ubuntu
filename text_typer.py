@@ -120,7 +120,7 @@ class TextTyper:
         try:
             subprocess.run(
                 ["xdotool", "keyup"] + modifiers,
-                timeout=3,
+                timeout=0.3,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )

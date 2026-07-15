@@ -13,7 +13,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 _env_path = Path(__file__).resolve().parent / ".env"
-load_dotenv(dotenv_path=_env_path)
+load_dotenv(dotenv_path=_env_path, override=True)
 
 # ── Key listener ──────────────────────────────────────────────────────
 DEVICE_NAME = "input-remapper keyboard"
@@ -49,7 +49,7 @@ COPY_TO_CLIPBOARD = "yes"
 
 # ── Timeouts ───────────────────────────────────────────────────────────
 TYPING_TIMEOUT = 5      # seconds before xdotool is killed + clipboard fallback
-TRANSCRIPTION_TIMEOUT = 10  # seconds for socket connect/recv
+TRANSCRIPTION_TIMEOUT = 30  # seconds for socket connect/recv
 
 # ── Deepgram streaming ────────────────────────────────────────────────
 DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY", "")

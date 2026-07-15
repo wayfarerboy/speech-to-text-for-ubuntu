@@ -45,7 +45,7 @@ EOF
 echo "==> Wrote $SYSTEMD_USER_DIR/stt-server.service"
 
 systemctl --user daemon-reload
-systemctl --user enable --now stt-server.service
+systemctl --user restart stt-server.service
 echo "==> stt-server.service enabled and started"
 
 # ── system service: key listener ──────────────────────────────────────
@@ -70,7 +70,7 @@ EOF
 echo "==> Wrote $SYSTEMD_SYSTEM_DIR/stt-keylistener.service"
 
 pkexec systemctl daemon-reload
-pkexec systemctl enable --now stt-keylistener.service
+pkexec systemctl restart stt-keylistener.service
 echo "==> stt-keylistener.service enabled and started"
 
 echo ""

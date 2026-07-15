@@ -268,10 +268,16 @@ def main():
                                     indicator_pid = indicator.pid
                                     _spawn_coordinator(language, indicator_pid)
                             elapsed = time.monotonic() - started_at
-                            logging.info(
-                                "Recording stopped in %.2f seconds (coordinator spawned)",
-                                elapsed,
-                            )
+                            if isinstance(session, PushToTalkSessionStreaming):
+                                logging.info(
+                                    "Recording stopped in %.2f seconds (streaming)",
+                                    elapsed,
+                                )
+                            else:
+                                logging.info(
+                                    "Recording stopped in %.2f seconds (coordinator spawned)",
+                                    elapsed,
+                                )
                         except Exception as e:
                             logging.error("Stop recording failed: %s", e)
 

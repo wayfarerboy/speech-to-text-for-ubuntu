@@ -136,8 +136,16 @@ class PushToTalkSessionStreaming:
 
         if self._worker_thread and self._worker_thread.is_alive():
             self._worker_thread.join(timeout=15)
+            if self._worker_thread.is_alive():
+                logger.warning("Worker thread did not stop after 15s — forcing fallback")
+                self._fallback_needed = True
 
         self._indicator.hide()
+
+        logger.info(
+            "Streaming stop: transcript=%s, fallback_needed=%s",
+            bool(self._transcript), self._fallback_needed,
+        )
 
         text = ""
         try:
@@ -147,8 +155,12 @@ class PushToTalkSessionStreaming:
             else:
                 text = self._transcript or ""
 
+            logger.info("Final text: len=%d, preview=%r", len(text), text[:80] if text else "(empty)")
+
             if text.strip():
                 self._typer.type(text)
+            else:
+                logger.warning("No text to type — transcript was empty")
         finally:
             self._cleanup()
 
@@ -171,8 +183,9 @@ class PushToTalkSessionStreaming:
         # 1. Connect
         try:
             _run_async(dg.connect())
-        except Exception:
-            logger.warning("Deepgram connect failed — will fall back")
+            logger.info("Deepgram WebSocket connected")
+        except Exception as exc:
+            logger.warning("Deepgram connect failed — will fall back: %s", exc)
             self._fallback_needed = True
             self._capture_pcm_only()
             return
@@ -188,6 +201,10 @@ class PushToTalkSessionStreaming:
         if not self._fallback_needed:
             try:
                 self._transcript = _run_async(dg.stop_and_get_text())
+                logger.info(
+                    "Deepgram transcript drained: len=%d",
+                    len(self._transcript) if self._transcript else 0,
+                )
             except Exception as exc:
                 logger.warning("Deepgram drain failed: %s — falling back", exc)
                 self._fallback_needed = True

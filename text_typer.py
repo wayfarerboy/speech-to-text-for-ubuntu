@@ -83,12 +83,12 @@ class TextTyper:
 
     def _run_as_user(self, cmd, timeout=None, **kwargs):
         """Run a command as the desktop user, not root."""
-        popen_kwargs = {
-            "env": self._env,
-            "stdout": kwargs.pop("stdout", subprocess.DEVNULL),
-            "stderr": kwargs.pop("stderr", subprocess.PIPE),
-            **kwargs,
-        }
+        popen_kwargs: dict = {"env": self._env}
+        if "stdout" not in kwargs and "capture_output" not in kwargs:
+            popen_kwargs["stdout"] = subprocess.DEVNULL
+        if "stderr" not in kwargs and "capture_output" not in kwargs:
+            popen_kwargs["stderr"] = subprocess.PIPE
+        popen_kwargs.update(kwargs)
         if timeout is not None:
             popen_kwargs["timeout"] = timeout
         if self._uid is not None and self._gid is not None:

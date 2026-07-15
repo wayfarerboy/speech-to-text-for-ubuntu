@@ -42,7 +42,7 @@ class TextTyper:
                 pass  # best-effort, never block typing
 
         try:
-            subprocess.run(
+            result = subprocess.run(
                 ["xdotool", "type", "--delay", "0", "--clearmodifiers", text_to_type],
                 check=True,
                 capture_output=True,
@@ -50,6 +50,9 @@ class TextTyper:
                 timeout=config.TYPING_TIMEOUT,
                 env=self._env,
             )
+            logger.info("xdotool typed %d chars successfully", len(text))
+            if result.stderr:
+                logger.info("xdotool stderr: %s", result.stderr.strip())
         except subprocess.TimeoutExpired:
             logger.warning(
                 "xdotool timed out after %ss — falling back to clipboard",
@@ -58,8 +61,8 @@ class TextTyper:
             self._safe_clipboard_fallback(text)
         except subprocess.CalledProcessError as e:
             logger.warning(
-                "xdotool exited %s — falling back to clipboard",
-                e.returncode,
+                "xdotool exited %s (stderr: %s) — falling back to clipboard",
+                e.returncode, e.stderr.strip() if e.stderr else "none",
             )
             self._safe_clipboard_fallback(text)
         except Exception as e:

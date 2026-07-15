@@ -52,7 +52,8 @@ echo "==> stt-server.service enabled and started"
 
 SYSTEMD_SYSTEM_DIR="/etc/systemd/system"
 
-pkexec tee "$SYSTEMD_SYSTEM_DIR/stt-keylistener.service" > /dev/null <<EOF
+pkexec bash -c "
+    tee '$SYSTEMD_SYSTEM_DIR/stt-keylistener.service' > /dev/null <<UNITEOF
 [Unit]
 Description=Speech-to-text key listener
 Wants=graphical.target
@@ -65,13 +66,13 @@ RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-EOF
+UNITEOF
+    systemctl daemon-reload
+    systemctl restart stt-keylistener.service
+    echo 'keylistener deployed'
+"
 
-echo "==> Wrote $SYSTEMD_SYSTEM_DIR/stt-keylistener.service"
-
-pkexec systemctl daemon-reload
-pkexec systemctl restart stt-keylistener.service
-echo "==> stt-keylistener.service enabled and started"
+echo "==> stt-keylistener.service deployed and restarted"
 
 echo ""
 echo "Done. Both services are running."

@@ -11,19 +11,7 @@ Use `pkexec` for privileged operations — `sudo` fails in agent contexts (no TT
 bash deploy/deploy-services.sh
 ```
 
-The deploy script handles `stt-server` (user) internally via `systemctl --user restart`.
-It runs `pkexec systemctl restart stt-keylistener.service` for the system service —
-**verify the restart actually took effect** (pkexec dialog may fail silently):
-
-```bash
-systemctl status stt-keylistener --no-pager | head -5
-```
-
-If the PID hasn't changed, restart manually:
-
-```bash
-pkexec systemctl restart stt-keylistener.service
-```
+The deploy script handles `stt-server` (user) and `stt-keylistener` (system) in **one pkexec call** — single password prompt.
 
 **Lesson:** after any change to `config.py`, `.env`, `deepgram_streaming_client.py`,
 or `push_to_talk_session_streaming.py`, always restart **both** services and verify

@@ -2,16 +2,32 @@
 
 Use `pkexec` for privileged operations — `sudo` fails in agent contexts (no TTY). `pkexec` brings up a GUI auth dialog.
 
-```bash
-# Restart system services
-pkexec systemctl restart stt-keylistener.service
+**Two services, both must restart on any config change:**
+- `stt-server` — user service (local Whisper transcription)
+- `stt-keylistener` — system service (key capture, Deepgram streaming, typing)
 
+```bash
 # Deploy / redeploy all services (idempotent)
-bash deploy/deploy-services.sh  # user service (no sudo needed)
-pkexec systemctl restart stt-keylistener.service  # system service
+bash deploy/deploy-services.sh
 ```
 
-The deploy script rewrites systemd unit files and restarts everything. Safe to re-run.
+The deploy script handles `stt-server` (user) internally via `systemctl --user restart`.
+It runs `pkexec systemctl restart stt-keylistener.service` for the system service —
+**verify the restart actually took effect** (pkexec dialog may fail silently):
+
+```bash
+systemctl status stt-keylistener --no-pager | head -5
+```
+
+If the PID hasn't changed, restart manually:
+
+```bash
+pkexec systemctl restart stt-keylistener.service
+```
+
+**Lesson:** after any change to `config.py`, `.env`, `deepgram_streaming_client.py`,
+or `push_to_talk_session_streaming.py`, always restart **both** services and verify
+with `systemctl status` that new PIDs are active. Stale processes silently run old code.
 
 ## Agent skills
 

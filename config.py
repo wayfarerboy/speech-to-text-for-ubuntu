@@ -2,7 +2,16 @@
 
 Import this module and reference ``config.NAME``.  Tests that need to
 override a value can monkeypatch the attribute on this module directly.
+
+Secrets are loaded from a ``.env`` file (python-dotenv).  Copy
+``.env.example`` to ``.env`` and fill in real values.
 """
+
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ── Key listener ──────────────────────────────────────────────────────
 DEVICE_NAME = "input-remapper keyboard"
@@ -41,7 +50,7 @@ TYPING_TIMEOUT = 5      # seconds before xdotool is killed + clipboard fallback
 TRANSCRIPTION_TIMEOUT = 10  # seconds for socket connect/recv
 
 # ── Deepgram streaming ────────────────────────────────────────────────
-DEEPGRAM_API_KEY = "f496b23fa7b216583bfcfc3f3194e6b67ee4617a"
+DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY", "")
 DEEPGRAM_MODEL = "nova-2"
 DEEPGRAM_ENDPOINT = "wss://api.deepgram.com/v1/listen"
 

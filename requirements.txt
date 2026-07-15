@@ -4,3 +4,4 @@ soundfile
 faster-whisper
 sounddevice
 websockets
+python-dotenv

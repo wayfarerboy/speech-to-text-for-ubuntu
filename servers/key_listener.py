@@ -204,7 +204,7 @@ def main():
         from text_typer import TextTyper
         session = PushToTalkSessionStreaming(
             transcriber=TranscriptionClient(),
-            typer=TextTyper(env=env),
+            typer=TextTyper(env=env, user_uid=user_uid, user_gid=user_gid),
             indicator=indicator,
             audio_file=AUDIO_FILE,
             env=env,

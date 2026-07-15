@@ -15,13 +15,15 @@ class TextTyper:
     Interface: ``type(text)``.
     """
 
-    def __init__(self, clipboard_enabled=None, env=None):
+    def __init__(self, clipboard_enabled=None, env=None, user_uid=None, user_gid=None):
         self.clipboard_enabled = (
             clipboard_enabled
             if clipboard_enabled is not None
             else bool(str(config.COPY_TO_CLIPBOARD).strip())
         )
         self._env = env or os.environ
+        self._uid = user_uid
+        self._gid = user_gid
 
     def type(self, text):
         """Type *text* into the focused window, append a space,
@@ -42,13 +44,12 @@ class TextTyper:
                 pass  # best-effort, never block typing
 
         try:
-            result = subprocess.run(
-                ["xdotool", "type", "--delay", "0", "--clearmodifiers", text_to_type],
+            result = self._xdotool(
+                ["type", "--delay", "0", "--clearmodifiers", text_to_type],
+                timeout=config.TYPING_TIMEOUT,
                 check=True,
                 capture_output=True,
                 text=True,
-                timeout=config.TYPING_TIMEOUT,
-                env=self._env,
             )
             logger.info("xdotool typed %d chars successfully", len(text))
             if result.stderr:
@@ -80,6 +81,27 @@ class TextTyper:
 
     # ── internal ──────────────────────────────────────────────────
 
+    def _run_as_user(self, cmd, timeout=None, **kwargs):
+        """Run a command as the desktop user, not root."""
+        popen_kwargs = {
+            "env": self._env,
+            "stdout": kwargs.pop("stdout", subprocess.DEVNULL),
+            "stderr": kwargs.pop("stderr", subprocess.PIPE),
+            **kwargs,
+        }
+        if timeout is not None:
+            popen_kwargs["timeout"] = timeout
+        if self._uid is not None and self._gid is not None:
+            def _drop():
+                os.setgid(self._gid)
+                os.setuid(self._uid)
+            popen_kwargs["preexec_fn"] = _drop
+        return subprocess.run(cmd, **popen_kwargs)
+
+    def _xdotool(self, args, **kwargs):
+        """Shortcut for xdotool commands run as the user."""
+        return self._run_as_user(["xdotool"] + args, **kwargs)
+
     def _copy_to_clipboard(self, text):
         env = self._env
         if env.get("WAYLAND_DISPLAY"):
@@ -90,14 +112,13 @@ class TextTyper:
             logger.warning("No clipboard tool available.")
             return False
         try:
-            subprocess.run(
+            self._run_as_user(
                 cmd,
                 input=text,
                 check=True,
                 text=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                env=self._env,
             )
             return True
         except FileNotFoundError:
@@ -107,8 +128,7 @@ class TextTyper:
             logger.warning("Clipboard copy failed (exit %s)", e.returncode)
             return False
 
-    @staticmethod
-    def _release_modifiers():
+    def _release_modifiers(self):
         """Release all modifier keys — belt-and-suspenders after xdotool.
 
         xdotool's --clearmodifiers is unreliable on XWayland/Wayland.
@@ -121,8 +141,8 @@ class TextTyper:
             "Meta_L", "Meta_R",
         ]
         try:
-            subprocess.run(
-                ["xdotool", "keyup"] + modifiers,
+            self._xdotool(
+                ["keyup"] + modifiers,
                 timeout=0.3,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,

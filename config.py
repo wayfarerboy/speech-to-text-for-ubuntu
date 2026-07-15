@@ -8,10 +8,12 @@ Secrets are loaded from a ``.env`` file (python-dotenv).  Copy
 """
 
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+_env_path = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=_env_path)
 
 # ── Key listener ──────────────────────────────────────────────────────
 DEVICE_NAME = "input-remapper keyboard"

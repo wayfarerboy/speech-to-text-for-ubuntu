@@ -45,7 +45,7 @@ class TextTyper:
 
         try:
             result = self._xdotool(
-                ["type", "--delay", "0", "--clearmodifiers", text_to_type],
+                ["type", "--delay", "3", "--clearmodifiers", text_to_type],
                 timeout=config.TYPING_TIMEOUT,
                 check=True,
                 capture_output=True,
@@ -143,7 +143,7 @@ class TextTyper:
         try:
             self._xdotool(
                 ["keyup"] + modifiers,
-                timeout=0.3,
+                timeout=2,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )

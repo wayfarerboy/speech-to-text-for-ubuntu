@@ -43,9 +43,14 @@ class TextTyper:
             except Exception:
                 pass  # best-effort, never block typing
 
+        # Release modifiers BEFORE typing — clean slate.
+        # xdotool --clearmodifiers can inject modifier restore events
+        # that collide with typed text on cold X11 start.
+        self._release_modifiers()
+
         try:
             result = self._xdotool(
-                ["type", "--delay", "3", "--clearmodifiers", text_to_type],
+                ["type", "--delay", "5", text_to_type],
                 timeout=config.TYPING_TIMEOUT,
                 check=True,
                 capture_output=True,

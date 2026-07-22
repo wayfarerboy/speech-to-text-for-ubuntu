@@ -1,17 +1,15 @@
 ### Deployment
 
-Use `pkexec` for privileged operations — `sudo` fails in agent contexts (no TTY). `pkexec` brings up a GUI auth dialog.
-
-**Two services, both must restart on any config change:**
+**Two user services, both must restart on any config change:**
 - `stt-server` — user service (local Whisper transcription)
-- `stt-keylistener` — system service (key capture, Deepgram streaming, typing)
+- `stt-keylistener` — user service (key capture via `input` group, Deepgram streaming, typing)
+
+**Prerequisite:** user must be in `input` group (`sudo usermod -a -G input $USER` + re-login).
 
 ```bash
-# Deploy / redeploy all services (idempotent)
+# Deploy / redeploy all services (idempotent, no root needed)
 bash deploy/deploy-services.sh
 ```
-
-The deploy script handles `stt-server` (user) and `stt-keylistener` (system) in **one pkexec call** — single password prompt.
 
 **Lesson:** after any change to `config.py`, `.env`, `deepgram_streaming_client.py`,
 or `push_to_talk_session_streaming.py`, always restart **both** services and verify

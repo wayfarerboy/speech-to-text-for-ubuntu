@@ -9,7 +9,7 @@ One complete push-to-talk cycle: key press → recording → transcription → t
 _Avoid_: Recording, session (overloaded)
 
 **Key Listener**:
-The root-privileged process that reads `/dev/input` events and spawns coordinators. Never blocks on transcription or typing.
+The process that reads `/dev/input` events (needs root or `input` group) and spawns coordinators. Never blocks on transcription or typing. Runs as a user systemd service with `SupplementaryGroups=input`.
 _Avoid_: Hotkey daemon, input watcher
 
 **Coordinator**:

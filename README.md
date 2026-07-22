@@ -101,7 +101,7 @@ In particular, you will usually want to adjust:
 
 Script paths (client, indicator) and the Python virtual environment are derived automatically from this script's location and the user's home directory — no hardcoded paths to edit.
 
-The key listener must be run as root because it needs access to `/dev/input/event*`.
+The key listener needs access to `/dev/input/event*` — either run as root or add your user to the `input` group (`sudo usermod -a -G input $USER`), then log out and back in.
 
 ## Configure the speech-to-text server
 
@@ -168,7 +168,13 @@ This starts a Unix socket server at:
 /tmp/stt_server.sock
 ```
 
-Then start the key listener as root:
+Then start the key listener. If your user is in the `input` group:
+
+```bash
+~/venv/bin/python3 ~/speech-to-text-for-ubuntu/servers/key_listener.py
+```
+
+Or as root if you haven't set up the `input` group:
 
 ```bash
 sudo python3 ~/speech-to-text-for-ubuntu/servers/key_listener.py
@@ -182,32 +188,39 @@ Typing is implemented with `xdotool`, which is primarily an X11-oriented solutio
 
 ## Start automatically on boot
 
-Run the deployment script to install and enable both systemd services:
+Run the deployment script to install and enable both systemd **user** services:
 
 ```bash
 chmod +x deploy/deploy-services.sh
 ./deploy/deploy-services.sh
 ```
 
-This creates and starts two services:
+This creates and starts two user services:
 
-- **User service** `stt-server` — the speech-to-text server, runs as your user
-- **System service** `stt-keylistener` — the key listener, runs as root (needed for `/dev/input/` access)
+- `stt-server` — the speech-to-text server
+- `stt-keylistener` — the key listener (uses `input` group for evdev access; see prerequisites)
 
-The script is idempotent — safe to re-run after pulling updates or changing paths.
+**Prerequisite:** your user must be in the `input` group for evdev access:
+
+```bash
+sudo usermod -a -G input $USER
+# Then log out and back in for the group to take effect.
+```
+
+The deploy script is idempotent — safe to re-run after pulling updates or changing paths.
 
 Check status:
 
 ```bash
 systemctl --user status stt-server
-systemctl status stt-keylistener
+systemctl --user status stt-keylistener
 ```
 
 Follow logs:
 
 ```bash
 journalctl --user -u stt-server -f
-sudo journalctl -u stt-keylistener -f
+journalctl --user -u stt-keylistener -f
 ```
 
 ## Logs
@@ -243,7 +256,7 @@ Ensure `sounddevice` is installed in the project's virtual environment:
 - Verify input-remapper preset is loaded and autoload is enabled.
 - Check that the `origin_hash` in the input-remapper preset matches the
   current keyboard (run input-remapper GUI to regenerate if needed).
-- Verify the key listener is running: `systemctl status stt-keylistener`.
+- Verify the key listener is running: `systemctl --user status stt-keylistener`.
 
 ## Testing
 

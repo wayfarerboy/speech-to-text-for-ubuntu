@@ -141,7 +141,12 @@ def setup_environment():
             sys.exit(1)
         env["XAUTHORITY"] = xauth_path
         logging.info(f"Set XAUTHORITY to {xauth_path} (static)")
+    elif "XAUTHORITY" in os.environ:
+        # Running as a user service — XAUTHORITY already inherited.
+        env["XAUTHORITY"] = os.environ["XAUTHORITY"]
+        logging.info(f"Set XAUTHORITY to {env['XAUTHORITY']} (inherited)")
     else:
+        # Running as root (system service) — sniff from ksmserver.
         try:
             pid = subprocess.check_output(
                 ["pgrep", "-u", USER, "-f", PROCESS_FOR_XAUTH_COPY],
@@ -173,10 +178,14 @@ def setup_environment():
 
 def main():
     """Main function."""
-    # Check if running as root
+    # Check if we have access to input devices (root or 'input' group).
     if os.geteuid() != 0:
-        logging.error("This script must be run as root")
-        sys.exit(1)
+        if not os.access('/dev/input/event0', os.R_OK):
+            logging.error(
+                "This script must be run as root or by a user in the 'input' group. "
+                "Run: sudo usermod -a -G input $USER && newgrp input"
+            )
+            sys.exit(1)
 
     # Setup
     env = setup_environment()

@@ -229,6 +229,8 @@ def main():
 
     def _spawn_coordinator(language, indicator_pid):
         """Spawn the coordinator as the desktop user (non-blocking)."""
+        # Only demote if running as root; when already the user, skip it.
+        demote_fn = _demote(user_uid, user_gid) if os.geteuid() == 0 else None
         try:
             subprocess.Popen(
                 [
@@ -239,7 +241,7 @@ def main():
                     "--indicator-pid", str(indicator_pid),
                 ],
                 env=env,
-                preexec_fn=_demote(user_uid, user_gid),
+                preexec_fn=demote_fn,
             )
         except Exception as e:
             logging.error("Failed to spawn coordinator: %s", e)

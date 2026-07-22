@@ -96,7 +96,10 @@ class TextTyper:
         popen_kwargs.update(kwargs)
         if timeout is not None:
             popen_kwargs["timeout"] = timeout
-        if self._uid is not None and self._gid is not None:
+        # Only demote if we're actually running as a different user (e.g. root).
+        # When already the target user, preexec_fn is unnecessary and can break
+        # when running via sg/newgrp (which locks the GID).
+        if self._uid is not None and self._gid is not None and os.geteuid() != self._uid:
             def _drop():
                 os.setgid(self._gid)
                 os.setuid(self._uid)
